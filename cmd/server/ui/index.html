@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Registry</title>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600;700&family=Red+Hat+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        rh: {
+          red: '#EE0000',
+          'red-dark': '#A30000',
+          'red-light': '#FF6060',
+          black: '#151515',
+          'gray-900': '#212427',
+          'gray-700': '#4D5258',
+          'gray-500': '#6A6E73',
+          'gray-300': '#D2D2D2',
+          'gray-100': '#F0F0F0',
+          white: '#FFFFFF',
+          blue: '#0066CC',
+          'blue-light': '#73BCF7',
+          green: '#3E8635',
+          'green-light': '#95D58F',
+          orange: '#F0AB00',
+          purple: '#6753AC',
+          cyan: '#009596',
+        }
+      },
+      fontFamily: {
+        'rh': ['"Red Hat Display"', 'system-ui', 'sans-serif'],
+        'rh-mono': ['"Red Hat Mono"', 'monospace'],
+      }
+    }
+  }
+}
+</script>
+<style>
+  body { font-family: 'Red Hat Display', system-ui, sans-serif; }
+  .card { transition: all 0.15s; cursor: pointer; }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(21,21,21,0.1); }
+  .badge { font-size: 11px; padding: 2px 10px; border-radius: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .badge-draft { background: #F0F0F0; color: #6A6E73; }
+  .badge-evaluated { background: #E7F1FA; color: #0066CC; }
+  .badge-approved { background: #F2E9F9; color: #6753AC; }
+  .badge-published { background: #E9F5E8; color: #3E8635; }
+  .badge-deprecated { background: #FDF1E0; color: #C46100; }
+  .badge-archived { background: #F0F0F0; color: #8A8D90; }
+  .kind-agent { border-left: 3px solid #0066CC; }
+  .kind-skill { border-left: 3px solid #6753AC; }
+  .kind-mcp-server { border-left: 3px solid #009596; }
+  .tab { padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; }
+  .tab.active { background: #151515; color: #FFFFFF; }
+  .tab:not(.active) { color: #6A6E73; }
+  .tab:not(.active):hover { color: #151515; background: #F0F0F0; }
+  .detail-section { background: #F9F9F9; border: 1px solid #E8E8E8; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+  .timeline-dot { width: 10px; height: 10px; border-radius: 50%; background: #EE0000; margin-top: 5px; }
+  .timeline-line { width: 2px; background: #D2D2D2; min-height: 20px; margin-left: 4px; }
+  #detail-panel { transition: all 0.2s; }
+  .panel-open #artifact-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .kind-label { font-family: 'Red Hat Mono', monospace; }
+  #detail-panel { overflow-wrap: break-word; word-break: break-word; }
+  #detail-panel .font-rh-mono { overflow-wrap: break-word; word-break: break-all; }
+  .detail-section { overflow: hidden; }
+</style>
+</head>
+<body class="min-h-screen bg-white text-rh-black">
+
+<!-- Header -->
+<header class="border-b border-rh-gray-300 px-6 py-4 flex items-center justify-between bg-rh-black">
+  <div class="flex items-center gap-3">
+    <div class="w-8 h-8 rounded flex items-center justify-center bg-rh-red font-bold text-sm text-white font-rh-mono">AR</div>
+    <h1 class="text-lg font-semibold text-white font-rh">Agent Registry</h1>
+  </div>
+  <input id="search" type="text" placeholder="Search artifacts..."
+    class="bg-rh-gray-900 border border-rh-gray-700 rounded px-4 py-2 text-sm w-72 focus:outline-none focus:border-rh-red text-rh-gray-100 placeholder-rh-gray-500">
+</header>
+
+<!-- Filters -->
+<div class="px-6 py-3 flex items-center gap-2 border-b border-rh-gray-300 bg-white">
+  <div class="flex gap-1" id="kind-tabs">
+    <div class="tab active" data-kind="all">All</div>
+    <div class="tab" data-kind="agents">Agents</div>
+    <div class="tab" data-kind="skills">Skills</div>
+    <div class="tab" data-kind="mcp-servers">MCP Servers</div>
+  </div>
+  <div class="ml-auto">
+    <select id="status-filter" class="bg-white border border-rh-gray-300 rounded px-3 py-1.5 text-sm text-rh-gray-700 focus:border-rh-red focus:outline-none">
+      <option value="">All statuses</option>
+      <option value="draft">Draft</option>
+      <option value="evaluated">Evaluated</option>
+      <option value="approved">Approved</option>
+      <option value="published">Published</option>
+      <option value="deprecated">Deprecated</option>
+    </select>
+  </div>
+</div>
+
+<!-- Main content -->
+<div id="main-layout" class="flex h-[calc(100vh-120px)]">
+  <!-- Catalog grid -->
+  <div id="catalog" class="flex-1 p-6 overflow-y-auto min-w-0 bg-rh-gray-100">
+    <div id="artifact-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    <div id="empty-state" class="hidden text-center py-20 text-rh-gray-500">
+      <p class="text-lg font-medium">No artifacts found</p>
+      <p class="text-sm mt-1 font-rh-mono">agentctl push agents manifest.yaml</p>
+    </div>
+    <div id="loading" class="text-center py-20 text-rh-gray-500">Loading...</div>
+  </div>
+
+  <!-- Detail panel -->
+  <div id="detail-panel" class="hidden w-[480px] flex-shrink-0 border-l border-rh-gray-300 p-6 overflow-y-auto bg-white">
+    <div class="flex items-center justify-between mb-4">
+      <h2 id="detail-title" class="text-lg font-semibold truncate mr-2 font-rh-mono"></h2>
+      <button onclick="closeDetail()" class="text-rh-gray-500 hover:text-rh-black text-xl flex-shrink-0">&times;</button>
+    </div>
+    <div id="detail-content"></div>
+  </div>
+</div>
+
+<script>
+const API = '/api/v1';
+let allArtifacts = [];
+let activeKind = 'all';
+let activeStatus = '';
+
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  const json = await res.json();
+  return json.data || [];
+}
+
+async function loadAll() {
+  document.getElementById('loading').classList.remove('hidden');
+  try {
+    const [agents, skills, servers] = await Promise.all([
+      fetchJSON(`${API}/agents?limit=100`),
+      fetchJSON(`${API}/skills?limit=100`),
+      fetchJSON(`${API}/mcp-servers?limit=100`),
+    ]);
+    allArtifacts = [...agents, ...skills, ...servers];
+    render();
+  } catch (e) {
+    document.getElementById('loading').textContent = 'Failed to load: ' + e.message;
+  }
+}
+
+function render() {
+  document.getElementById('loading').classList.add('hidden');
+  const query = document.getElementById('search').value.toLowerCase();
+  const grid = document.getElementById('artifact-grid');
+  const empty = document.getElementById('empty-state');
+
+  let filtered = allArtifacts;
+  if (activeKind !== 'all') {
+    const kindMap = { agents: 'agent', skills: 'skill', 'mcp-servers': 'mcp-server' };
+    filtered = filtered.filter(a => a.kind === kindMap[activeKind]);
+  }
+  if (activeStatus) {
+    filtered = filtered.filter(a => a.status === activeStatus);
+  }
+  if (query) {
+    filtered = filtered.filter(a =>
+      a.identity.name.toLowerCase().includes(query) ||
+      a.identity.title.toLowerCase().includes(query) ||
+      a.identity.description.toLowerCase().includes(query) ||
+      (a.metadata?.tags || []).some(t => t.toLowerCase().includes(query))
+    );
+  }
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  grid.innerHTML = filtered.map(a => {
+    const cat = a.metadata?.category || '';
+    const tags = (a.metadata?.tags || []).slice(0, 3).map(t =>
+      `<span class="text-xs bg-rh-gray-100 text-rh-gray-700 px-1.5 py-0.5 rounded border border-rh-gray-300">${t}</span>`
+    ).join(' ');
+    return `
+      <div class="card kind-${a.kind} bg-white border border-rh-gray-300 rounded-lg p-4"
+           onclick="showDetail('${a.kind}', '${a.identity.name}', '${a.identity.version}')">
+        <div class="flex items-start justify-between mb-2">
+          <div class="text-xs text-rh-gray-500 font-medium kind-label">${a.kind}</div>
+          <span class="badge badge-${a.status}">${a.status}</span>
+        </div>
+        <div class="font-semibold text-rh-black mb-1">${a.identity.name}</div>
+        <div class="text-sm text-rh-gray-700 mb-2">${a.identity.title}</div>
+        <div class="text-xs text-rh-gray-500 mb-3 line-clamp-2">${a.identity.description}</div>
+        <div class="flex items-center justify-between">
+          <div class="text-xs text-rh-gray-500 font-rh-mono">v${a.identity.version}</div>
+          <div class="flex gap-1">${tags}</div>
+        </div>
+        ${cat ? `<div class="text-xs text-rh-gray-500 mt-2">${cat}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+async function showDetail(kind, name, version) {
+  const panel = document.getElementById('detail-panel');
+  const content = document.getElementById('detail-content');
+  const title = document.getElementById('detail-title');
+  panel.classList.remove('hidden');
+  document.getElementById('main-layout').classList.add('panel-open');
+
+  const parts = name.split('/');
+  const ns = parts[0], artifact = parts[1];
+  const kindPlural = kind === 'mcp-server' ? 'mcp-servers' : kind + 's';
+  const base = `${API}/${kindPlural}/${ns}/${artifact}/versions/${version}`;
+
+  title.textContent = `${name}@${version}`;
+  content.innerHTML = '<div class="text-rh-gray-500">Loading...</div>';
+
+  try {
+    const [artRes, inspectRes, depsRes] = await Promise.all([
+      fetchJSON(base),
+      fetchJSON(`${base}/inspect`),
+      fetchJSON(`${base}/dependencies`),
+    ]);
+
+    const a = artRes;
+    const inspect = inspectRes;
+    const deps = depsRes;
+
+    let html = '';
+
+    // Identity
+    html += `<div class="detail-section">
+      <div class="text-xs text-rh-gray-500 uppercase tracking-wider mb-2 font-semibold">Identity</div>
+      <div class="space-y-1 text-sm">
+        <div><span class="text-rh-gray-500">Kind:</span> <span class="text-rh-black font-medium">${a.kind}</span></div>
+        <div><span class="text-rh-gray-500">Status:</span> <span class="badge badge-${a.status}">${a.status}</span></div>
+        <div><span class="text-rh-gray-500">Version:</span> <span class="text-rh-black font-rh-mono">${a.identity?.version}</span></div>
+        <div><span class="text-rh-gray-500">Description:</span> <span class="text-rh-gray-700">${a.identity?.description}</span></div>
+        ${a.metadata?.license ? `<div><span class="text-rh-gray-500">License:</span> <span class="text-rh-black">${a.metadata.license}</span></div>` : ''}
+        ${a.metadata?.repository?.url ? `<div><span class="text-rh-gray-500">Repo:</span> <a href="${a.metadata.repository.url}" class="text-rh-blue hover:underline" target="_blank">${a.metadata.repository.url}</a></div>` : ''}
+      </div>
+    </div>`;
+
+    // OCI Artifacts
+    if (a.artifacts?.length) {
+      html += `<div class="detail-section">
+        <div class="text-xs text-rh-gray-500 uppercase tracking-wider mb-2 font-semibold">OCI Artifacts</div>
+        ${a.artifacts.map(ref => `<div class="text-sm text-rh-black font-rh-mono bg-rh-gray-100 border border-rh-gray-300 rounded px-3 py-2 mb-1 break-all">${ref.oci}${ref.digest ? `<br><span class="text-rh-gray-500 text-xs break-all">${ref.digest}</span>` : ''}</div>`).join('')}
+      </div>`;
+    }
+
+    // Eval records
+    const evalSummary = inspect.evalSummary;
+    html += `<div class="detail-section">
+      <div class="text-xs text-rh-gray-500 uppercase tracking-wider mb-2 font-semibold">Eval Records (${evalSummary?.totalRecords || 0})</div>`;
+    if (evalSummary?.totalRecords > 0) {
+      const cats = evalSummary.categories || {};
+      html += `<div class="space-y-1 text-sm">`;
+      for (const [cat, count] of Object.entries(cats)) {
+        const color = cat === 'safety' ? 'text-rh-orange' : cat === 'red-team' ? 'text-rh-red' : cat === 'functional' ? 'text-rh-green' : 'text-rh-gray-700';
+        html += `<div class="flex justify-between"><span class="${color} font-medium">${cat}</span><span class="text-rh-gray-500">${count} record(s)</span></div>`;
+      }
+      html += `<div class="flex justify-between mt-2 pt-2 border-t border-rh-gray-300"><span class="text-rh-gray-500">Average score</span><span class="text-rh-black font-semibold">${evalSummary.averageScore?.toFixed(2)}</span></div>`;
+      html += `</div>`;
+    } else {
+      html += `<div class="text-sm text-rh-gray-500">No eval records submitted</div>`;
+    }
+    html += `</div>`;
+
+    // Promotion history
+    const promotions = inspect.promotions || [];
+    html += `<div class="detail-section">
+      <div class="text-xs text-rh-gray-500 uppercase tracking-wider mb-2 font-semibold">Promotion History</div>`;
+    if (promotions.length > 0) {
+      html += `<div class="space-y-0">`;
+      promotions.forEach((p, i) => {
+        html += `<div class="flex gap-3">
+          <div class="flex flex-col items-center">
+            <div class="timeline-dot"></div>
+            ${i < promotions.length - 1 ? '<div class="timeline-line flex-1"></div>' : ''}
+          </div>
+          <div class="pb-4">
+            <div class="text-sm text-rh-black font-medium">${p.from} &rarr; ${p.to}</div>
+            ${p.comment ? `<div class="text-xs text-rh-gray-500 mt-0.5">${p.comment}</div>` : ''}
+            <div class="text-xs text-rh-gray-500 mt-0.5">${formatTime(p.timestamp)}</div>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    } else {
+      html += `<div class="text-sm text-rh-gray-500">No promotions yet</div>`;
+    }
+    html += `</div>`;
+
+    // Dependencies
+    html += `<div class="detail-section">
+      <div class="text-xs text-rh-gray-500 uppercase tracking-wider mb-2 font-semibold">Dependencies</div>`;
+    if (deps.dependencies?.length > 0) {
+      html += `<div class="space-y-1 text-sm font-rh-mono">`;
+      deps.dependencies.forEach(d => {
+        const resolved = d.resolved;
+        const icon = resolved ? '<span class="text-rh-green">&#10003;</span>' : '<span class="text-rh-red">&#10007;</span>';
+        const ver = d.version || d.versionConstraint || '?';
+        html += `<div>${icon} <span class="text-rh-gray-500">${d.kind}</span> <span class="text-rh-black">${d.name}</span><span class="text-rh-gray-500">@${ver}</span></div>`;
+      });
+      html += `</div>`;
+    } else {
+      html += `<div class="text-sm text-rh-gray-500">No dependencies declared</div>`;
+    }
+    html += `</div>`;
+
+    content.innerHTML = html;
+  } catch (e) {
+    content.innerHTML = `<div class="text-rh-red">Error: ${e.message}</div>`;
+  }
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.add('hidden');
+  document.getElementById('main-layout').classList.remove('panel-open');
+}
+
+function formatTime(ts) {
+  if (!ts) return '';
+  try { return new Date(ts).toLocaleString(); } catch { return ts; }
+}
+
+document.getElementById('search').addEventListener('input', render);
+document.getElementById('status-filter').addEventListener('change', e => {
+  activeStatus = e.target.value;
+  render();
+});
+document.querySelectorAll('#kind-tabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#kind-tabs .tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    activeKind = tab.dataset.kind;
+    render();
+  });
+});
+
+loadAll();
+</script>
+</body>
+</html>

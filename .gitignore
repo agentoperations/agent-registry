@@ -1,0 +1,32 @@
+# Binaries
+/arctl
+/agentctl
+bin/
+*.exe
+
+# Database
+*.db
+
+# Spec (local reference only)
+SPEC.md
+
+# Claude Code
+.claude/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*~
+
+# Playwright
+.playwright-mcp/
+
+# Generated recordings and demo scripts
+*.mp4
+!docs/screenshots/demo-preview.mp4
+*.gif
+*.show
+
+# OS
+.DS_Store

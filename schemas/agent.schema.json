@@ -1,0 +1,295 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentregistry.dev/schemas/agent.schema.json",
+  "title": "Agent Artifact",
+  "description": "Extension schema for artifacts of kind 'agent'. Defines capabilities, runtime configuration, and references the agent-specific Bill of Materials.",
+  "type": "object",
+  "properties": {
+    "capabilities": {
+      "$ref": "#/$defs/AgentCapabilities",
+      "description": "Declared capabilities of the agent including supported protocols and modalities (Tier 1, optional)."
+    },
+    "runtime": {
+      "$ref": "#/$defs/AgentRuntime",
+      "description": "Runtime configuration for deploying and running the agent (Tier 1, optional)."
+    },
+    "bom": {
+      "$ref": "bom.schema.json#/$defs/AgentBOM",
+      "description": "Agent-specific Bill of Materials describing model, tool, skill, prompt, and orchestration dependencies (Tier 1 optional, Tier 2 required)."
+    }
+  },
+  "$defs": {
+    "AgentCapabilities": {
+      "type": "object",
+      "description": "Capabilities declared by the agent.",
+      "properties": {
+        "protocols": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "examples": ["mcp", "a2a", "openai-chat", "anthropic-messages", "custom"]
+          },
+          "uniqueItems": true,
+          "description": "Communication protocols the agent supports."
+        },
+        "inputModalities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["text", "image", "audio", "video", "file", "structured-data"]
+          },
+          "uniqueItems": true,
+          "description": "Input modalities the agent can accept."
+        },
+        "outputModalities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["text", "image", "audio", "video", "file", "structured-data"]
+          },
+          "uniqueItems": true,
+          "description": "Output modalities the agent can produce."
+        },
+        "streaming": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the agent supports streaming responses."
+        },
+        "multiTurn": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the agent supports multi-turn conversations."
+        },
+        "contextWindow": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum context window size in tokens."
+        },
+        "maxOutputTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum output tokens per response."
+        }
+      },
+      "additionalProperties": false
+    },
+    "AgentRuntime": {
+      "type": "object",
+      "description": "Runtime configuration for deploying the agent as a service.",
+      "properties": {
+        "env": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EnvVar"
+          },
+          "description": "Environment variables for configuration."
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PortConfig"
+          },
+          "description": "Network ports exposed by the agent."
+        },
+        "healthCheck": {
+          "$ref": "#/$defs/HealthCheck",
+          "description": "Health check configuration for liveness/readiness probes."
+        },
+        "resources": {
+          "$ref": "#/$defs/ResourceRequirements",
+          "description": "Compute resource requirements and limits."
+        },
+        "command": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Container entrypoint command."
+        },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Arguments to the entrypoint command."
+        },
+        "replicas": {
+          "$ref": "#/$defs/ReplicaConfig",
+          "description": "Replica scaling configuration."
+        }
+      },
+      "additionalProperties": false
+    },
+    "EnvVar": {
+      "type": "object",
+      "description": "Environment variable definition.",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Environment variable name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the variable's purpose."
+        },
+        "required": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this environment variable must be set."
+        },
+        "default": {
+          "type": "string",
+          "description": "Default value if not explicitly set."
+        },
+        "sensitive": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, value should be treated as a secret (e.g., API keys)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "PortConfig": {
+      "type": "object",
+      "description": "Network port exposed by the agent.",
+      "required": ["containerPort"],
+      "properties": {
+        "containerPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Port number inside the container."
+        },
+        "protocol": {
+          "type": "string",
+          "enum": ["TCP", "UDP"],
+          "default": "TCP",
+          "description": "Transport protocol."
+        },
+        "description": {
+          "type": "string",
+          "description": "Purpose of this port."
+        }
+      },
+      "additionalProperties": false
+    },
+    "HealthCheck": {
+      "type": "object",
+      "description": "Health check configuration for liveness/readiness probes.",
+      "properties": {
+        "httpGet": {
+          "type": "object",
+          "description": "HTTP health check configuration.",
+          "required": ["path", "port"],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "HTTP path to check (e.g., '/health')."
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "description": "Port to check."
+            }
+          },
+          "additionalProperties": false
+        },
+        "initialDelaySeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Seconds before the first health check."
+        },
+        "periodSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10,
+          "description": "Seconds between health checks."
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Seconds before a health check times out."
+        },
+        "failureThreshold": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3,
+          "description": "Number of consecutive failures before marking unhealthy."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ResourceRequirements": {
+      "type": "object",
+      "description": "Compute resource requests and limits, following Kubernetes conventions.",
+      "properties": {
+        "requests": {
+          "$ref": "#/$defs/ResourceSpec",
+          "description": "Minimum guaranteed resources."
+        },
+        "limits": {
+          "$ref": "#/$defs/ResourceLimitSpec",
+          "description": "Maximum resource limits."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ResourceSpec": {
+      "type": "object",
+      "description": "Resource request specification.",
+      "properties": {
+        "cpu": {
+          "type": "string",
+          "description": "CPU request in cores or millicores (e.g., '500m', '2')."
+        },
+        "memory": {
+          "type": "string",
+          "description": "Memory request with unit suffix (e.g., '512Mi', '4Gi')."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ResourceLimitSpec": {
+      "type": "object",
+      "description": "Resource limit specification, including GPU.",
+      "properties": {
+        "cpu": {
+          "type": "string",
+          "description": "CPU limit in cores or millicores (e.g., '2000m', '4')."
+        },
+        "memory": {
+          "type": "string",
+          "description": "Memory limit with unit suffix (e.g., '4Gi', '8Gi')."
+        },
+        "gpu": {
+          "type": "string",
+          "description": "GPU count (e.g., '1')."
+        },
+        "gpuType": {
+          "type": "string",
+          "description": "GPU type (e.g., 'nvidia-a10g', 'nvidia-h100')."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReplicaConfig": {
+      "type": "object",
+      "description": "Replica scaling configuration.",
+      "properties": {
+        "min": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1,
+          "description": "Minimum number of replicas."
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Maximum number of replicas."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

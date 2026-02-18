@@ -1,0 +1,47 @@
+---
+config:
+  theme: dark
+  themeVariables:
+    fontSize: 16px
+    fontFamily: "Helvetica Neue, Arial, sans-serif"
+  flowchart:
+    nodeSpacing: 25
+    rankSpacing: 50
+    padding: 16
+    htmlLabels: true
+---
+
+flowchart LR
+    subgraph ACTORS[" "]
+        direction TB
+        CLI["<b>agentctl</b><br/>init · push · list<br/>promote · eval<br/>inspect · search · deps"]
+        EXT["<b>External Tools</b><br/>Garak · eval-hub<br/>lm-eval-harness<br/>TrustyAI · CI"]
+        CON["<b>Consumers</b><br/>Runtimes · IDEs<br/>CI/CD"]
+    end
+
+    subgraph REG["<b>Agent Registry</b>"]
+        direction TB
+        UI["<b>UI</b><br/>Catalog · Detail"]
+        API["<b>REST API</b><br/>CRUD · Promote<br/>Evals · Inspect<br/>Search · Deps"]
+        SVC["<b>Service</b><br/>State Machine<br/>BOM Resolution"]
+        DB["<b>Store Interface</b><br/>SQLite (PoC) · Postgres<br/>artifacts · eval_records<br/>promotion_log"]
+        UI --> API --> SVC --> DB
+    end
+
+    OCI["<b>OCI</b><br/>ghcr.io<br/>quay.io"]
+
+    CLI -->|HTTP| API
+    EXT -->|POST /evals| API
+    CON -->|discover| API
+    CON -->|pull| OCI
+
+    style ACTORS fill:none,stroke:#475569
+    style REG fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#e2e8f0
+    style CLI fill:#1c1917,stroke:#a8a29e,color:#e7e5e4
+    style EXT fill:#7c2d12,stroke:#f97316,color:#fed7aa
+    style CON fill:#1e1b4b,stroke:#818cf8,color:#c7d2fe
+    style UI fill:#0c4a6e,stroke:#0ea5e9,color:#bae6fd
+    style API fill:#1e3a5f,stroke:#3b82f6,color:#93c5fd
+    style SVC fill:#581c87,stroke:#a855f7,color:#d8b4fe
+    style DB fill:#7f1d1d,stroke:#ef4444,color:#fecaca
+    style OCI fill:#14532d,stroke:#22c55e,color:#dcfce7

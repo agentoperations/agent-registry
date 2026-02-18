@@ -1,0 +1,26 @@
+# Agent Registry Spec — Minimal Skill
+#
+# Demonstrates the minimum viable skill manifest.
+# A skill is a reusable instruction bundle (SKILL.md + optional scripts/assets)
+# packaged as an OCI artifact (typically FROM scratch).
+# At minimum, a skill needs identity, a content entrypoint, and an artifact reference.
+
+kind: skill
+apiVersion: v1alpha1
+
+identity:
+  name: k8s-troubleshooting
+  version: 1.0.0
+  title: Kubernetes Troubleshooting
+  description: >-
+    Step-by-step diagnostic procedures for common Kubernetes failure modes
+    including CrashLoopBackOff, ImagePullBackOff, OOMKilled, and scheduling failures.
+
+content:
+  entrypoint: SKILL.md
+
+artifacts:
+  - registry: ghcr.io
+    repository: example-org/k8s-troubleshooting-skill
+    tag: "1.0.0"
+    digest: sha256:3c9909afec25354d551dae21590bb26e38d53f2173b8d3dc3eee4c047e7ab1c1

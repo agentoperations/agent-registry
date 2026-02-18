@@ -1,0 +1,498 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentregistry.dev/schemas/bom.schema.json",
+  "title": "Bill of Materials",
+  "description": "Kind-aware Bill of Materials schema. Defines three variants: AgentBOM, SkillBOM, and MCPServerBOM, each tailored to the dependencies of their respective artifact kind.",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/AgentBOM" },
+    { "$ref": "#/$defs/SkillBOM" },
+    { "$ref": "#/$defs/MCPServerBOM" }
+  ],
+  "$defs": {
+    "AgentBOM": {
+      "type": "object",
+      "description": "Bill of Materials for an agent artifact. Captures model dependencies, tools, skills, prompts, orchestration patterns, memory, session, and identity configuration.",
+      "properties": {
+        "models": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AgentModelDependency"
+          },
+          "description": "AI models the agent depends on."
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AgentToolDependency"
+          },
+          "description": "MCP server dependencies."
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SkillReference"
+          },
+          "description": "Skill dependencies."
+        },
+        "prompts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AgentPromptSpec"
+          },
+          "description": "Prompt declarations with integrity hashes."
+        },
+        "orchestration": {
+          "$ref": "#/$defs/OrchestrationConfig",
+          "description": "Orchestration framework and pattern configuration."
+        },
+        "memory": {
+          "$ref": "#/$defs/MemoryConfig",
+          "description": "Memory and context management configuration."
+        },
+        "session": {
+          "$ref": "#/$defs/SessionConfig",
+          "description": "Session management configuration."
+        },
+        "identity": {
+          "$ref": "#/$defs/AgentIdentityConfig",
+          "description": "Agent identity and authentication configuration."
+        }
+      },
+      "additionalProperties": false
+    },
+    "SkillBOM": {
+      "type": "object",
+      "description": "Bill of Materials for a skill artifact. Captures skill dependencies, abstract tool requirements, and abstract model requirements.",
+      "properties": {
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SkillDependency"
+          },
+          "description": "Other skills or libraries this skill depends on."
+        },
+        "toolRequirements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SkillToolRequirement"
+          },
+          "description": "Abstract tool requirements (not tied to specific MCP servers)."
+        },
+        "modelRequirements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SkillModelRequirement"
+          },
+          "description": "Abstract model capability requirements."
+        }
+      },
+      "additionalProperties": false
+    },
+    "MCPServerBOM": {
+      "type": "object",
+      "description": "Bill of Materials for an MCP server artifact. Captures runtime dependencies, external services, and model dependencies.",
+      "properties": {
+        "runtimeDependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RuntimeDependency"
+          },
+          "description": "Runtime and library dependencies."
+        },
+        "externalServices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExternalService"
+          },
+          "description": "External services required."
+        },
+        "modelDependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MCPModelDependency"
+          },
+          "description": "AI model dependencies."
+        }
+      },
+      "additionalProperties": false
+    },
+    "AgentModelDependency": {
+      "type": "object",
+      "description": "AI model dependency for an agent.",
+      "required": ["name", "provider", "role"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Model identifier as recognized by the provider (e.g., 'claude-sonnet-4-20250514', 'gpt-4o')."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Model provider (e.g., 'anthropic', 'openai', 'google', 'meta', 'local')."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["primary", "secondary", "embedding", "classification", "routing", "evaluation"],
+          "description": "How the model is used in the agent's architecture."
+        },
+        "contextWindow": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Context window size in tokens."
+        },
+        "maxOutputTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum output tokens."
+        },
+        "costTier": {
+          "type": "string",
+          "enum": ["free", "low", "standard", "premium"],
+          "description": "Cost classification."
+        },
+        "version": {
+          "type": "string",
+          "description": "Specific model version constraint."
+        },
+        "fineTuned": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this is a fine-tuned model."
+        },
+        "fineTuneBase": {
+          "type": "string",
+          "description": "Base model used for fine-tuning."
+        }
+      },
+      "additionalProperties": false
+    },
+    "AgentToolDependency": {
+      "type": "object",
+      "description": "MCP server dependency for an agent.",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Fully qualified MCP server name (namespace/name)."
+        },
+        "version": {
+          "type": "string",
+          "description": "Version constraint (semver range, e.g., '>=1.0.0', '^2.0.0')."
+        },
+        "required": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether the tool is required for the agent to function."
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Specific tool names required from this server. If omitted, all tools may be used."
+        }
+      },
+      "additionalProperties": false
+    },
+    "SkillReference": {
+      "type": "object",
+      "description": "Reference to a skill artifact.",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Fully qualified skill name."
+        },
+        "version": {
+          "type": "string",
+          "description": "Version constraint (semver range)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "AgentPromptSpec": {
+      "type": "object",
+      "description": "Prompt declaration with integrity hash.",
+      "required": ["name", "source"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Prompt identifier."
+        },
+        "source": {
+          "type": "string",
+          "enum": ["inline", "file", "registry", "url"],
+          "description": "Source type for the prompt content."
+        },
+        "path": {
+          "type": "string",
+          "description": "File path (when source is 'file')."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL (when source is 'url')."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["system", "few-shot", "template", "guardrail"],
+          "description": "Prompt role."
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "description": "Content integrity hash (e.g., 'sha256:...')."
+        }
+      },
+      "additionalProperties": false
+    },
+    "OrchestrationConfig": {
+      "type": "object",
+      "description": "Orchestration framework and pattern configuration.",
+      "required": ["framework"],
+      "properties": {
+        "framework": {
+          "type": "string",
+          "description": "Orchestration framework identifier (e.g., 'adk', 'langchain', 'crewai', 'autogen', 'custom')."
+        },
+        "frameworkVersion": {
+          "type": "string",
+          "description": "Framework version constraint."
+        },
+        "pattern": {
+          "type": "string",
+          "enum": ["tool-use-loop", "chain-of-thought", "react", "plan-and-execute", "multi-agent", "custom"],
+          "description": "Orchestration pattern."
+        },
+        "maxIterations": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum orchestration loop iterations."
+        },
+        "parallelToolCalls": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the agent supports parallel tool execution."
+        },
+        "fallbackBehavior": {
+          "type": "string",
+          "enum": ["fail-fast", "graceful-degradation", "retry", "human-in-the-loop"],
+          "description": "Behavior on failure."
+        }
+      },
+      "additionalProperties": false
+    },
+    "MemoryConfig": {
+      "type": "object",
+      "description": "Memory and context management configuration.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["vector-store", "key-value", "graph", "none"],
+          "description": "Memory type."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Memory provider (e.g., 'chromadb', 'pinecone', 'redis')."
+        },
+        "persistenceRequired": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether memory must persist across sessions."
+        }
+      },
+      "additionalProperties": false
+    },
+    "SessionConfig": {
+      "type": "object",
+      "description": "Session management configuration.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["stateless", "stateful", "persistent"],
+          "description": "Session type."
+        },
+        "maxDuration": {
+          "type": "string",
+          "description": "Maximum session duration (Go duration format, e.g., '24h', '30m')."
+        },
+        "storageBackend": {
+          "type": "string",
+          "description": "Session storage backend (e.g., 'redis', 'postgres', 'memory')."
+        }
+      },
+      "additionalProperties": false
+    },
+    "AgentIdentityConfig": {
+      "type": "object",
+      "description": "Agent identity and authentication configuration.",
+      "properties": {
+        "supportsMultiTenant": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the agent supports multi-tenant operation."
+        },
+        "authMethods": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["oauth2", "api-key", "mtls", "saml"]
+          },
+          "uniqueItems": true,
+          "description": "Authentication methods the agent can use."
+        }
+      },
+      "additionalProperties": false
+    },
+    "SkillDependency": {
+      "type": "object",
+      "description": "Dependency on another skill or library.",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Dependency name."
+        },
+        "version": {
+          "type": "string",
+          "description": "Version constraint."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["skill", "library"],
+          "default": "skill",
+          "description": "Dependency type."
+        }
+      },
+      "additionalProperties": false
+    },
+    "SkillToolRequirement": {
+      "type": "object",
+      "description": "Abstract tool requirement for a skill (not tied to a specific MCP server).",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Logical tool category name."
+        },
+        "description": {
+          "type": "string",
+          "description": "What the tool is needed for."
+        },
+        "required": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether the tool is required."
+        },
+        "operations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Specific operations needed."
+        }
+      },
+      "additionalProperties": false
+    },
+    "SkillModelRequirement": {
+      "type": "object",
+      "description": "Abstract model capability requirement for a skill.",
+      "required": ["capability"],
+      "properties": {
+        "capability": {
+          "type": "string",
+          "enum": ["code-analysis", "text-generation", "reasoning", "vision", "embedding"],
+          "description": "Required capability."
+        },
+        "minContextWindow": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Minimum context window needed."
+        },
+        "preferredProviders": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Preferred model providers."
+        }
+      },
+      "additionalProperties": false
+    },
+    "RuntimeDependency": {
+      "type": "object",
+      "description": "Runtime or library dependency for an MCP server.",
+      "required": ["name", "version", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Dependency name."
+        },
+        "version": {
+          "type": "string",
+          "description": "Version constraint."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["runtime", "library", "system"],
+          "description": "Dependency type."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExternalService": {
+      "type": "object",
+      "description": "External service dependency for an MCP server.",
+      "required": ["name", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Service name."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["database", "cache", "api", "queue", "storage", "other"],
+          "description": "Service type."
+        },
+        "required": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether the service is required."
+        },
+        "connectionEnv": {
+          "type": "string",
+          "description": "Environment variable name for the connection string."
+        },
+        "baseUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Service base URL (for APIs)."
+        },
+        "authEnv": {
+          "type": "string",
+          "description": "Environment variable name for authentication."
+        }
+      },
+      "additionalProperties": false
+    },
+    "MCPModelDependency": {
+      "type": "object",
+      "description": "AI model dependency for an MCP server.",
+      "required": ["name", "provider"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Model identifier."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Model provider."
+        },
+        "purpose": {
+          "type": "string",
+          "description": "What the model is used for."
+        },
+        "required": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether the model is required."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

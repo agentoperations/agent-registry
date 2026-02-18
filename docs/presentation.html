@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Registry</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --r-background-color: #0a0e17;
+    --r-main-color: #c9d1d9;
+    --r-heading-color: #e6edf3;
+    --r-link-color: #58a6ff;
+    --r-selection-background-color: #1f6feb;
+    --r-heading-font: 'Inter', -apple-system, sans-serif;
+    --r-main-font: 'Inter', -apple-system, sans-serif;
+    --r-code-font: 'JetBrains Mono', monospace;
+    --r-main-font-size: 30px;
+  }
+  .reveal { font-weight: 300; letter-spacing: 0.01em; }
+  .reveal h1 { font-size: 2.2em; font-weight: 700; font-family: 'JetBrains Mono', monospace; letter-spacing: -0.02em; }
+  .reveal h2 { font-size: 1.3em; font-weight: 600; color: #58a6ff; border-bottom: 1px solid #21262d; padding-bottom: 10px; margin-bottom: 0.6em; font-family: 'JetBrains Mono', monospace; letter-spacing: -0.01em; }
+  .reveal h3 { font-size: 0.95em; font-weight: 600; color: #bc8cff; font-family: 'JetBrains Mono', monospace; }
+  .reveal pre { font-size: 0.58em; box-shadow: none; margin: 12px 0; }
+  .reveal code { font-family: 'JetBrains Mono', monospace; font-weight: 400; }
+  .reveal pre code {
+    padding: 18px 20px;
+    border-radius: 6px;
+    background: #0d1117;
+    border: 1px solid #21262d;
+    line-height: 1.5;
+    font-size: 0.95em;
+  }
+  .reveal p code, .reveal li code {
+    background: #161b22;
+    border: 1px solid #21262d;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    color: #79c0ff;
+  }
+  .reveal li { margin-bottom: 0.4em; font-size: 0.82em; line-height: 1.5; }
+  .reveal .subtitle { color: #8b949e; font-size: 0.65em; font-weight: 300; margin-top: 0.5em; font-family: 'Inter', sans-serif; }
+  .reveal .badge { display: inline-block; padding: 3px 12px; border-radius: 4px; font-size: 0.5em; font-weight: 500; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 3px; font-family: 'JetBrains Mono', monospace; border: 1px solid; }
+  .badge-blue { background: #0d1f3c; color: #58a6ff; border-color: #1f3d6e; }
+  .badge-purple { background: #1a0533; color: #bc8cff; border-color: #3b1f6e; }
+  .badge-green { background: #0a2e1a; color: #3fb950; border-color: #1b6e3a; }
+  .badge-orange { background: #2a1507; color: #d29922; border-color: #6e4a1f; }
+  .badge-red { background: #2a0a0a; color: #f85149; border-color: #6e1f1f; }
+  .badge-gray { background: #161b22; color: #8b949e; border-color: #30363d; }
+  .reveal table { font-size: 0.58em; border-collapse: collapse; width: 100%; font-family: 'JetBrains Mono', monospace; }
+  .reveal table th { background: #161b22; color: #58a6ff; font-weight: 500; text-align: left; padding: 8px 12px; border-bottom: 1px solid #21262d; }
+  .reveal table td { padding: 6px 12px; border-bottom: 1px solid #161b22; color: #c9d1d9; }
+  .reveal .flow-box { background: #0d1117; border-radius: 6px; padding: 12px 18px; margin: 8px 0; font-size: 0.68em; border-left: 3px solid #1f6feb; border: 1px solid #21262d; border-left: 3px solid #1f6feb; }
+  .reveal .flow-box.purple { border-left-color: #8b5cf6; }
+  .reveal .flow-box.green { border-left-color: #3fb950; }
+  .reveal .flow-box.orange { border-left-color: #d29922; }
+  .reveal .flow-box.red { border-left-color: #f85149; }
+  .reveal .two-col { display: flex; gap: 30px; }
+  .reveal .two-col > div { flex: 1; }
+  .reveal .dim { color: #484f58; }
+  .reveal .highlight { color: #ffa657; }
+  .reveal .slide-number { background: transparent; color: #30363d; font-size: 13px; font-family: 'JetBrains Mono', monospace; }
+  .reveal .footer-text { position: fixed; bottom: 14px; left: 24px; font-size: 11px; color: #30363d; font-family: 'JetBrains Mono', monospace; letter-spacing: 1px; }
+  .reveal strong { color: #e6edf3; font-weight: 600; }
+  .reveal .prompt::before { content: '$ '; color: #3fb950; }
+  .reveal .cursor { display: inline-block; width: 8px; height: 1.1em; background: #58a6ff; animation: blink 1s step-end infinite; vertical-align: text-bottom; margin-left: 2px; }
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ============ TITLE ============ -->
+<section>
+  <p style="font-size:0.4em; color:#30363d; font-family:'JetBrains Mono',monospace; margin-bottom:30px;">v0.1.0</p>
+  <h1>agent<span style="color:#58a6ff;">registry</span></h1>
+  <p class="subtitle">a vendor-neutral registry for AI agents, skills, and MCP servers</p>
+  <br>
+  <p style="font-size:0.5em;">
+    <span class="badge badge-blue">agents</span>
+    <span class="badge badge-purple">skills</span>
+    <span class="badge badge-green">mcp-servers</span>
+  </p>
+  <p style="font-size:0.35em; color:#30363d; font-family:'JetBrains Mono',monospace; margin-top:40px;">
+    <span style="color:#3fb950;">$</span> agentctl server start<span class="cursor"></span>
+  </p>
+</section>
+
+<!-- ============ THE PROBLEM ============ -->
+<section>
+  <h2>The Problem</h2>
+  <ul>
+    <li class="fragment">AI agents are being built everywhere &mdash; but there's no standard way to <strong>register, discover, or trust them</strong></li>
+    <li class="fragment">Container registries store bytes &mdash; they don't know what models an agent uses, whether it's been safety-tested, or what it depends on</li>
+    <li class="fragment">No supply chain visibility for AI artifacts &mdash; what's the BOM? Has it been evaluated? Who approved it?</li>
+  </ul>
+</section>
+
+<!-- ============ WHAT IT IS ============ -->
+<section>
+  <h2>What the Agent Registry Is</h2>
+  <div class="fragment flow-box">
+    A <strong>metadata store</strong> that sits alongside OCI registries as a governance and discovery layer
+  </div>
+  <div class="fragment flow-box purple">
+    Stores structured metadata about agents, skills, and MCP servers &mdash; <strong>not the binaries themselves</strong>
+  </div>
+  <div class="fragment flow-box green">
+    Accepts <strong>evaluation signals</strong> from any external tool (Garak, eval-hub, lm-eval-harness, custom CI)
+  </div>
+  <div class="fragment flow-box orange">
+    Enforces a <strong>promotion lifecycle</strong>: draft &rarr; evaluated &rarr; approved &rarr; published
+  </div>
+</section>
+
+<!-- ============ THREE ARTIFACT KINDS ============ -->
+<section>
+  <h2>Three Artifact Kinds</h2>
+  <div class="two-col">
+    <div>
+      <h3><span class="badge badge-blue">Agent</span></h3>
+      <ul>
+        <li class="fragment">Autonomous AI system with its own runtime</li>
+        <li class="fragment">Declares models, tools, skills, orchestration</li>
+        <li class="fragment">Has a container image in OCI</li>
+      </ul>
+      <br>
+      <h3><span class="badge badge-purple">Skill</span></h3>
+      <ul>
+        <li class="fragment">Prompt-based capability, no runtime</li>
+        <li class="fragment">Consumed by agents or AI IDEs</li>
+        <li class="fragment">Declares tool requirements, not concrete tools</li>
+      </ul>
+    </div>
+    <div>
+      <h3><span class="badge badge-green">MCP Server</span></h3>
+      <ul>
+        <li class="fragment">Model Context Protocol server</li>
+        <li class="fragment">Exposes tools, resources, prompts</li>
+        <li class="fragment">Declares transport (stdio, HTTP, SSE)</li>
+      </ul>
+      <br>
+      <div class="fragment" style="margin-top:20px;">
+        <p style="font-size:0.7em; color:#94a3b8;">All three share:<br>identity, versioning, promotion lifecycle, eval records, BOM</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ USER JOURNEY ============ -->
+<section>
+  <h2>User Journey</h2>
+  <pre><code class="language-text" data-trim>
+You build an agent        agentctl does the rest            Others find it
+──────────────────        ────────────────────              ──────────────
+
+docker push image    ──>  agentctl init --path .            agentctl search "k8s"
+                          (LLM reads your code,             agentctl inspect ...
+                           generates manifest)              agentctl deps ...
+                                                            agentctl get ...
+                     ──>  agentctl push agents m.yaml              ↓
+                          (draft — private, mutable)        docker pull + deploy
+
+                     ──>  agentctl eval attach ...
+                          (external tools submit results)
+
+                     ──>  agentctl promote --to evaluated   Content locks here.
+                     ──>  agentctl promote --to approved
+                     ──>  agentctl promote --to published   Now discoverable.
+  </code></pre>
+</section>
+
+<!-- ============ MANIFEST GENERATION ============ -->
+<section>
+  <h2>Step 1: Generate Manifest</h2>
+  <p style="font-size:0.7em; color:#94a3b8;">LLM reads your source code and generates the full YAML. No manual writing.</p>
+  <pre class="fragment"><code class="language-bash" data-trim>
+agentctl init --path ./my-agent \
+    --image ghcr.io/acme/cluster-doctor:1.0.0 \
+    -o manifest.yaml
+  </code></pre>
+  <div class="fragment">
+    <p style="font-size:0.6em; color:#94a3b8; margin-top:20px;">Supports any LLM provider:</p>
+    <p>
+      <span class="badge badge-blue">Anthropic</span>
+      <span class="badge badge-green">OpenAI</span>
+      <span class="badge badge-orange">Ollama</span>
+      <span class="badge badge-purple">vLLM</span>
+      <span class="badge badge-gray">Any OpenAI-compatible</span>
+    </p>
+  </div>
+</section>
+
+<!-- ============ PUSH + EVAL ============ -->
+<section>
+  <h2>Step 2: Push &amp; Evaluate</h2>
+  <pre class="fragment"><code class="language-bash" data-trim>
+# Register the artifact (lands in draft)
+agentctl push agents manifest.yaml
+  </code></pre>
+  <pre class="fragment"><code class="language-bash" data-trim>
+# External tools submit eval records (optional)
+agentctl eval attach agents acme/cluster-doctor 1.0.0 \
+    --category safety --provider garak \
+    --benchmark toxicity --score 0.96
+
+agentctl eval attach agents acme/cluster-doctor 1.0.0 \
+    --category functional --provider eval-hub \
+    --benchmark accuracy --score 0.88
+  </code></pre>
+  <p class="fragment" style="font-size:0.6em; color:#94a3b8;">The registry stores eval records. It does not run evaluations or compute trust scores.</p>
+</section>
+
+<!-- ============ PROMOTION LIFECYCLE ============ -->
+<section>
+  <h2>Step 3: Promote</h2>
+  <div style="display:flex; gap:10px; justify-content:center; margin:20px 0;">
+    <span class="fragment badge badge-gray">draft</span>
+    <span class="fragment dim">&rarr;</span>
+    <span class="fragment badge badge-blue">evaluated</span>
+    <span class="fragment dim">&rarr;</span>
+    <span class="fragment badge badge-purple">approved</span>
+    <span class="fragment dim">&rarr;</span>
+    <span class="fragment badge badge-green">published</span>
+    <span class="fragment dim">&rarr;</span>
+    <span class="fragment badge badge-orange">deprecated</span>
+    <span class="fragment dim">&rarr;</span>
+    <span class="fragment badge badge-red">archived</span>
+  </div>
+  <pre class="fragment"><code class="language-bash" data-trim>
+agentctl promote agents acme/cluster-doctor 1.0.0 --to evaluated
+agentctl promote agents acme/cluster-doctor 1.0.0 --to approved
+agentctl promote agents acme/cluster-doctor 1.0.0 --to published
+  </code></pre>
+  <p class="fragment" style="font-size:0.6em; color:#94a3b8;">Content becomes immutable after <code>evaluated</code>. What was evaluated is what gets shipped.</p>
+</section>
+
+<!-- ============ INSPECT ============ -->
+<section>
+  <h2>Step 4: Inspect</h2>
+  <pre><code class="language-text" data-trim>
+$ agentctl inspect agents acme/cluster-doctor 1.0.0
+
+agent acme/cluster-doctor@1.0.0
+  Status:    published
+  Title:     Cluster Doctor
+  Published: 2026-02-20T09:24:16Z
+
+Eval Records: 3
+  functional     1 record(s)
+  safety         1 record(s)
+  red-team       1 record(s)
+  Average score: 0.92
+
+Promotion History:
+  draft → evaluated   — 3 evals pass
+  evaluated → approved — Reviewed by platform team lead
+  approved → published — Ready for production
+  </code></pre>
+</section>
+
+<!-- ============ DEPENDENCIES ============ -->
+<section>
+  <h2>Dependency Graph (from BOM)</h2>
+  <pre><code class="language-text" data-trim>
+$ agentctl deps agents acme/cluster-doctor 1.0.0
+
+agent acme/cluster-doctor@1.0.0
+  |- mcp-server acme/kubernetes-mcp@2.0.0 [resolved]
+  |- mcp-server acme/prometheus-mcp@>=1.0.0 [UNRESOLVED]
+  |- skill acme/k8s-troubleshooting@1.0.0 [resolved]
+  |- model claude-sonnet-4@anthropic [resolved]
+  </code></pre>
+  <div class="fragment">
+    <p style="font-size:0.65em; color:#94a3b8;">The BOM captures the full dependency graph:</p>
+    <p style="font-size:0.6em;">
+      <strong>Agents</strong> declare models, tools (MCP servers), skills, prompts, orchestration<br>
+      <strong>Skills</strong> declare tool requirements (abstract, not tied to specific MCP servers)<br>
+      <strong>MCP Servers</strong> declare runtime dependencies, external services
+    </p>
+  </div>
+</section>
+
+<!-- ============ ARCHITECTURE ============ -->
+<section>
+  <h2>Architecture</h2>
+  <div class="two-col" style="font-size:0.65em;">
+    <div>
+      <div class="flow-box"><strong>agentctl CLI</strong><br>Thin HTTP client. init, push, list, promote, eval, inspect, search, deps</div>
+      <div class="flow-box orange"><strong>External Tools</strong><br>Garak, eval-hub, lm-eval-harness, TrustyAI, custom CI</div>
+      <div class="flow-box purple"><strong>Consumers</strong><br>Agent runtimes, AI IDEs, CI/CD</div>
+    </div>
+    <div>
+      <div class="flow-box" style="border-left-color:#0ea5e9;"><strong>UI</strong> &mdash; embedded HTML catalog</div>
+      <div class="flow-box"><strong>REST API</strong> &mdash; Chi router, /api/v1</div>
+      <div class="flow-box purple"><strong>Service</strong> &mdash; state machine, BOM resolution</div>
+      <div class="flow-box red"><strong>Store Interface</strong> &mdash; SQLite (PoC) / Postgres</div>
+      <div class="flow-box green"><strong>OCI Registries</strong> &mdash; ghcr.io, quay.io (content)</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DESIGN PRINCIPLES ============ -->
+<section>
+  <h2>Design Principles</h2>
+  <ul>
+    <li class="fragment"><strong>Metadata, not payloads</strong> &mdash; binary content stays in OCI registries</li>
+    <li class="fragment"><strong>Evals are external signals</strong> &mdash; the registry stores them, doesn't compute trust</li>
+    <li class="fragment"><strong>Promotion is a state machine</strong> &mdash; no hardcoded gates, policy layers add externally</li>
+    <li class="fragment"><strong>CLI is a thin client</strong> &mdash; all logic server-side, any entry point behaves identically</li>
+    <li class="fragment"><strong>Store is swappable</strong> &mdash; SQLite for PoC, Postgres for production</li>
+    <li class="fragment"><strong>Manifest generation is LLM-powered</strong> &mdash; zero YAML writing for developers</li>
+  </ul>
+</section>
+
+<!-- ============ WHAT'S NEXT ============ -->
+<section>
+  <h2>What's Next</h2>
+  <ul>
+    <li class="fragment">Trust scoring as a pluggable external service (TrustyAI integration)</li>
+    <li class="fragment">Configurable promotion gates (webhook-based policy engine)</li>
+    <li class="fragment">OCI registry integration (push + pull content from the registry)</li>
+    <li class="fragment">Federation (peer discovery, cross-registry search, sync)</li>
+    <li class="fragment">Authentication and RBAC</li>
+    <li class="fragment">Postgres backend for production</li>
+  </ul>
+</section>
+
+<!-- ============ DEMO ============ -->
+<section>
+  <h1 style="font-size:1.8em;">demo<span class="cursor"></span></h1>
+  <br>
+  <pre><code class="language-bash" data-trim>
+./scripts/demo.sh
+  </code></pre>
+  <p style="font-size:0.5em; color:#484f58; font-family:'JetBrains Mono',monospace; margin-top:30px;">
+    UI &rarr; <span style="color:#58a6ff;">http://localhost:8080</span><br>
+    API &rarr; <span style="color:#58a6ff;">http://localhost:8080/api/v1</span>
+  </p>
+</section>
+
+</div><!-- /slides -->
+</div><!-- /reveal -->
+
+<div class="footer-text">Agent Registry</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({
+  hash: true,
+  controls: false,
+  progress: true,
+  slideNumber: 'c/t',
+  transition: 'fade',
+  transitionSpeed: 'fast',
+  center: true,
+  width: 1280,
+  height: 720,
+  margin: 0.08,
+  plugins: [RevealHighlight]
+});
+</script>
+</body>
+</html>

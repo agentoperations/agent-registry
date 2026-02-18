@@ -1,0 +1,21 @@
+# Agent Registry Spec — Tier 0: Minimal Agent
+#
+# Demonstrates the absolute minimum viable agent manifest.
+# Only identity and a single OCI artifact reference are required.
+# This is the starting point for any agent that has been containerized
+# and pushed to an OCI registry but has no additional metadata.
+
+kind: agent
+apiVersion: v1alpha1
+
+identity:
+  name: hello-agent
+  version: 0.1.0
+  title: Hello Agent
+  description: A minimal example agent that echoes user messages.
+
+artifacts:
+  - registry: ghcr.io
+    repository: example-org/hello-agent
+    tag: "0.1.0"
+    digest: sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4

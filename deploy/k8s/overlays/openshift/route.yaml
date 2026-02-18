@@ -1,0 +1,16 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: agent-registry
+  labels:
+    app.kubernetes.io/name: agent-registry
+spec:
+  to:
+    kind: Service
+    name: agent-registry
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
