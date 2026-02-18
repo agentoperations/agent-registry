@@ -1,0 +1,237 @@
+# Agent Registry Spec — Tier 2: Production Agent
+#
+# Demonstrates a fully-specified production agent: "Cluster Doctor".
+# This agent diagnoses Kubernetes cluster issues by combining skills
+# (k8s-troubleshooting, incident-response) with MCP servers
+# (kubernetes-mcp, prometheus-mcp, alertmanager-mcp).
+#
+# Includes every optional section: metadata, capabilities, runtime,
+# BOM (models, tools, skills, prompts, orchestration), provenance,
+# and trust signals.
+#
+# All fields conform to the JSON schemas in ../schemas/.
+
+kind: agent
+apiVersion: v1alpha1
+
+identity:
+  name: cluster-doctor
+  version: 1.0.0
+  title: Cluster Doctor
+  description: >-
+    AI-powered Kubernetes cluster diagnostics agent. Analyzes pod failures,
+    resource contention, network policies, and alert correlations to provide
+    actionable remediation steps.
+
+metadata:
+  labels:
+    team: platform-engineering
+    tier: production
+    domain: infrastructure
+  tags:
+    - kubernetes
+    - observability
+    - incident-response
+    - sre
+  category: infrastructure/diagnostics
+  authors:
+    - name: Platform Engineering Team
+      email: platform-eng@example.com
+      url: https://github.com/example-org
+  license: Apache-2.0
+  repository: https://github.com/example-org/cluster-doctor
+
+capabilities:
+  protocols:
+    - a2a
+    - mcp
+  inputModalities:
+    - text
+  outputModalities:
+    - text
+
+runtime:
+  env:
+    - name: KUBECONFIG
+      description: Path to the kubeconfig file
+      required: true
+    - name: PROMETHEUS_URL
+      description: Prometheus server base URL
+      required: true
+    - name: ALERTMANAGER_URL
+      description: Alertmanager server base URL
+      required: true
+    - name: LOG_LEVEL
+      description: Logging verbosity
+      required: false
+      default: info
+  ports:
+    - name: a2a
+      containerPort: 8080
+      protocol: TCP
+    - name: metrics
+      containerPort: 9090
+      protocol: TCP
+  healthCheck:
+    path: /healthz
+    port: 9090
+    interval: 30s
+    timeout: 5s
+    retries: 3
+  resources:
+    requests:
+      cpu: "500m"
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+      gpu: "0"
+
+artifacts:
+  - registry: ghcr.io
+    repository: example-org/cluster-doctor
+    tag: "1.0.0"
+    digest: sha256:b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c
+
+bom:
+  models:
+    - role: primary
+      name: granite-3.1-8b-instruct
+      provider: ibm
+      version: "3.1"
+      pinning: minor
+    - role: fallback
+      name: llama-3.1-70b-instruct
+      provider: meta
+      version: "3.1"
+      pinning: minor
+
+  tools:
+    - type: mcp-server
+      name: kubernetes-mcp
+      version: ">=1.0.0"
+      required: true
+      transport: streamable-http
+      capabilities:
+        - get-pods
+        - describe-resource
+        - get-logs
+    - type: mcp-server
+      name: prometheus-mcp
+      version: ">=2.0.0"
+      required: true
+      transport: streamable-http
+      capabilities:
+        - query-instant
+        - query-range
+        - get-alerts
+    - type: mcp-server
+      name: alertmanager-mcp
+      version: ">=1.0.0"
+      required: true
+      transport: streamable-http
+      capabilities:
+        - list-alerts
+        - silence-alert
+
+  skills:
+    - name: k8s-troubleshooting
+      version: ">=1.0.0"
+    - name: incident-response
+      version: ">=2.0.0"
+
+  prompts:
+    - contentHash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      version: "1.0.0"
+      templates:
+        - name: system
+          role: system
+          content: >-
+            You are Cluster Doctor, an expert Kubernetes diagnostics agent.
+            Analyze cluster health, identify root causes, and provide
+            actionable remediation steps.
+
+  orchestration:
+    pattern: single-agent
+    framework: llama-stack
+    runtime: python-3.12
+
+provenance:
+  slsa:
+    level: 3
+    buildType: https://slsa.dev/container/v1
+    builder:
+      id: https://github.com/example-org/cluster-doctor/.github/workflows/release.yaml
+  signatures:
+    - keyId: fulcio:platform-eng@example.com
+      signature: MEUCIQDKzR3bG7v5d+kLpJ1nF...base64...==
+      rekorLogId: 24296fb24b8ad77aa3ee84fbc9bce2da0c5f
+  sbom:
+    format: SPDX
+    uri: https://github.com/example-org/cluster-doctor/releases/download/v1.0.0/sbom.spdx.json
+    digest: sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+
+trustSignals:
+  compositeScore: 0.82
+  calculatedAt: "2026-02-01T10:00:00Z"
+  components:
+    provenance:
+      score: 0.90
+      weight: 0.25
+      lastUpdated: "2026-02-01T10:00:00Z"
+      details:
+        slsaLevel: 3
+        signatureVerified: true
+        sbomAvailable: true
+        reproducibleBuild: false
+    evaluation:
+      score: 0.87
+      weight: 0.25
+      lastUpdated: "2026-01-20T14:00:00Z"
+      details:
+        benchmarkCount: 3
+        passingRate: 0.87
+        lastEvaluated: "2026-01-20T14:00:00Z"
+        evaluationFreshness: current
+    codeHealth:
+      score: 0.78
+      weight: 0.20
+      lastUpdated: "2026-02-01T10:00:00Z"
+      details:
+        testCoverage: 0.78
+        lintingPassed: true
+        vulnerabilities:
+          critical: 0
+          high: 0
+          medium: 2
+          low: 5
+        dependencyFreshness: 0.92
+    publisherReputation:
+      score: 0.85
+      weight: 0.15
+      lastUpdated: "2026-02-01T10:00:00Z"
+      details:
+        verified: true
+        publishedArtifactCount: 24
+        accountAge: 3y2m
+        incidentHistory: 0
+    community:
+      score: 0.72
+      weight: 0.10
+      lastUpdated: "2026-02-01T10:00:00Z"
+      details:
+        downloads: 12400
+        stars: 340
+        activeUsers: 89
+        issueResponseTime: 4h
+    operational:
+      score: 0.80
+      weight: 0.05
+      lastUpdated: "2026-02-01T10:00:00Z"
+      details:
+        uptime: 0.997
+        errorRate: 0.003
+        medianLatency: 1200ms
+        p99Latency: 4500ms
+
+status: published

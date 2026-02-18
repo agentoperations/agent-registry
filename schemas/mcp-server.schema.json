@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentregistry.dev/schemas/mcp-server.schema.json",
+  "title": "MCP Server Artifact",
+  "description": "Extension schema for artifacts of kind 'mcp-server'. Defines transport configuration, exposed tools, resources, and prompts following the Model Context Protocol specification.",
+  "type": "object",
+  "properties": {
+    "transport": {
+      "$ref": "#/$defs/MCPTransport",
+      "description": "Transport configuration for connecting to the MCP server (Tier 1, optional)."
+    },
+    "tools": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/MCPTool"
+      },
+      "description": "Tools exposed by this MCP server. Maximum 500 entries."
+    },
+    "resources": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "$ref": "#/$defs/MCPResource"
+      },
+      "description": "Resources exposed by this MCP server. Maximum 200 entries."
+    },
+    "prompts": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/MCPPrompt"
+      },
+      "description": "Prompt templates exposed by this MCP server. Maximum 100 entries."
+    },
+    "bom": {
+      "$ref": "bom.schema.json#/$defs/MCPServerBOM",
+      "description": "MCP server-specific Bill of Materials describing runtime, external service, and model dependencies (Tier 1 optional, Tier 2 required)."
+    }
+  },
+  "$defs": {
+    "MCPTransport": {
+      "type": "object",
+      "description": "Transport configuration for the MCP server. Required fields depend on the transport type.",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["stdio", "streamable-http", "sse"],
+          "description": "Transport protocol type. 'stdio' for local process communication, 'streamable-http' for HTTP-based streaming, 'sse' for Server-Sent Events."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Endpoint URL. Required when type is 'streamable-http' or 'sse'."
+        },
+        "command": {
+          "type": "string",
+          "description": "Command to start the server. Required for 'stdio' transport."
+        },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Arguments for the command (stdio transport)."
+        },
+        "env": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EnvVar"
+          },
+          "description": "Environment variables (same schema as agent runtime env)."
+        },
+        "authorization": {
+          "$ref": "#/$defs/Authorization",
+          "description": "Authorization configuration for remote transports."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "const": "stdio" } },
+            "required": ["type"]
+          },
+          "then": {
+            "required": ["command"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "enum": ["streamable-http", "sse"] } },
+            "required": ["type"]
+          },
+          "then": {
+            "required": ["url"]
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "EnvVar": {
+      "type": "object",
+      "description": "Environment variable definition.",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Environment variable name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description."
+        },
+        "required": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this variable must be set."
+        },
+        "default": {
+          "type": "string",
+          "description": "Default value."
+        },
+        "sensitive": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, value should be treated as a secret."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Authorization": {
+      "type": "object",
+      "description": "Authorization configuration for remote MCP server transports.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["bearer", "api-key", "oauth2"],
+          "description": "Authorization type."
+        },
+        "tokenUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "OAuth2 token endpoint URL."
+        },
+        "scopes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Required OAuth2 scopes."
+        }
+      },
+      "additionalProperties": false
+    },
+    "MCPTool": {
+      "type": "object",
+      "description": "A tool exposed by the MCP server, following the MCP tool specification.",
+      "required": ["name", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Tool identifier. Must be unique within the server."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the tool's purpose."
+        },
+        "inputSchema": {
+          "type": "object",
+          "description": "JSON Schema describing the tool's input parameters.",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "MCPResource": {
+      "type": "object",
+      "description": "A resource exposed by the MCP server, following the MCP resource specification.",
+      "required": ["uri", "name"],
+      "properties": {
+        "uri": {
+          "type": "string",
+          "description": "URI template for the resource."
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable resource name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Resource description."
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "MIME type of the resource content (e.g., 'application/json', 'text/plain')."
+        }
+      },
+      "additionalProperties": false
+    },
+    "MCPPrompt": {
+      "type": "object",
+      "description": "A prompt template exposed by the MCP server, following the MCP prompt specification.",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Prompt identifier."
+        },
+        "description": {
+          "type": "string",
+          "description": "What the prompt does."
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MCPPromptArgument"
+          },
+          "description": "Prompt arguments."
+        }
+      },
+      "additionalProperties": false
+    },
+    "MCPPromptArgument": {
+      "type": "object",
+      "description": "An argument for an MCP prompt template.",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Argument name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Argument description."
+        },
+        "required": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this argument is required."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

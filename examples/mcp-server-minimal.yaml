@@ -1,0 +1,83 @@
+# Agent Registry Spec — Minimal MCP Server
+#
+# Demonstrates the minimum viable MCP server manifest.
+# An MCP server exposes tools (and optionally resources/prompts) over
+# the Model Context Protocol. At minimum it needs kind, identity,
+# transport configuration, a list of tools, and an artifact reference.
+
+kind: mcp-server
+apiVersion: v1alpha1
+
+identity:
+  name: kubernetes-mcp
+  version: 1.0.0
+  title: Kubernetes MCP Server
+  description: >-
+    MCP server providing read-only access to Kubernetes cluster resources.
+    Supports pod listing, resource inspection, and log retrieval.
+
+transport:
+  type: streamable-http
+  port: 8080
+  url: https://kubernetes-mcp.example.com/mcp
+
+tools:
+  - name: get-pods
+    description: List pods in a namespace with optional label selector filtering
+    inputSchema:
+      type: object
+      properties:
+        namespace:
+          type: string
+          description: "Kubernetes namespace (default: all namespaces)"
+        labelSelector:
+          type: string
+          description: "Label selector (e.g., app=nginx)"
+      required: []
+
+  - name: describe-resource
+    description: Get detailed description of any Kubernetes resource
+    inputSchema:
+      type: object
+      properties:
+        kind:
+          type: string
+          description: "Resource kind (e.g., Pod, Deployment, Service)"
+        name:
+          type: string
+          description: Resource name
+        namespace:
+          type: string
+          description: Kubernetes namespace
+      required:
+        - kind
+        - name
+
+  - name: get-logs
+    description: Retrieve container logs from a pod
+    inputSchema:
+      type: object
+      properties:
+        pod:
+          type: string
+          description: Pod name
+        namespace:
+          type: string
+          description: Kubernetes namespace
+        container:
+          type: string
+          description: Container name (required for multi-container pods)
+        tailLines:
+          type: integer
+          description: Number of lines from the end of the log to retrieve
+        sinceSeconds:
+          type: integer
+          description: Only return logs newer than this many seconds
+      required:
+        - pod
+
+artifacts:
+  - registry: ghcr.io
+    repository: example-org/kubernetes-mcp
+    tag: "1.0.0"
+    digest: sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824

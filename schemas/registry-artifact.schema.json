@@ -1,0 +1,309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentregistry.dev/schemas/registry-artifact.schema.json",
+  "title": "Registry Artifact",
+  "description": "Base schema for all registry artifacts. Uses the 'kind' discriminator to select agent, skill, or mcp-server specific extensions. Supports three progressive disclosure tiers: Tier 0 (minimal), Tier 1 (standard), and Tier 2 (production).",
+  "type": "object",
+  "required": ["identity", "kind", "artifacts"],
+  "properties": {
+    "identity": {
+      "$ref": "#/$defs/Identity",
+      "description": "Core identity fields that uniquely identify this artifact (Tier 0, required)."
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["agent", "skill", "mcp-server"],
+      "description": "Discriminator that determines the artifact type and which extension schema applies (Tier 0, required)."
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/OCIReference"
+      },
+      "description": "One or more OCI artifact references where this artifact's content is published (Tier 0, required, at least one)."
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata",
+      "description": "Supplementary metadata for discovery, categorization, and provenance (Tier 1, optional)."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "evaluated", "approved", "published", "deprecated", "archived"],
+      "default": "draft",
+      "description": "Promotion lifecycle status of the artifact version."
+    },
+    "provenance": {
+      "description": "Supply chain provenance information (Tier 2, optional). See provenance.schema.json.",
+      "$ref": "provenance.schema.json"
+    },
+    "evalBaseline": {
+      "$ref": "#/$defs/EvalBaseline",
+      "description": "Evaluation baseline requirements (Tier 2, optional)."
+    },
+    "trustSignals": {
+      "description": "Computed trust signals (Tier 2, optional). See trust-signals.schema.json.",
+      "$ref": "trust-signals.schema.json"
+    },
+    "deprecation": {
+      "$ref": "#/$defs/Deprecation",
+      "description": "Deprecation notice. Only applicable when status is 'deprecated'."
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "kind": { "const": "agent" }
+      },
+      "required": ["kind"],
+      "$ref": "agent.schema.json"
+    },
+    {
+      "properties": {
+        "kind": { "const": "skill" }
+      },
+      "required": ["kind"],
+      "$ref": "skill.schema.json"
+    },
+    {
+      "properties": {
+        "kind": { "const": "mcp-server" }
+      },
+      "required": ["kind"],
+      "$ref": "mcp-server.schema.json"
+    }
+  ],
+  "$defs": {
+    "Identity": {
+      "type": "object",
+      "description": "Core identity block that uniquely identifies an artifact. The combination of name + version must be unique within a registry instance.",
+      "required": ["name", "version", "title", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 255,
+          "description": "Fully qualified artifact name in '{namespace}/{name}' format. The namespace follows reverse-domain notation. Validation rules vary by kind."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$",
+          "description": "Semantic version string conforming to Semver 2.0.0."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Human-readable display title."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "description": "Brief description of the artifact's purpose."
+        }
+      },
+      "additionalProperties": false
+    },
+    "OCIReference": {
+      "type": "object",
+      "description": "Reference to an OCI-compliant container image or artifact.",
+      "required": ["oci"],
+      "properties": {
+        "oci": {
+          "type": "string",
+          "description": "OCI reference in '{registry}/{repository}:{tag}' or '{registry}/{repository}@{digest}' format."
+        },
+        "mediaType": {
+          "type": "string",
+          "description": "OCI media type of the artifact (e.g., 'application/vnd.oci.image.manifest.v1+json'). Defaults vary by kind."
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "description": "Content-addressable digest for immutable references (e.g., 'sha256:abc123...')."
+        },
+        "platform": {
+          "$ref": "#/$defs/Platform",
+          "description": "Target platform constraints."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Platform": {
+      "type": "object",
+      "description": "Target platform constraints for an OCI artifact.",
+      "properties": {
+        "os": {
+          "type": "string",
+          "enum": ["linux", "darwin", "windows"],
+          "description": "Target operating system."
+        },
+        "architecture": {
+          "type": "string",
+          "enum": ["amd64", "arm64", "arm", "s390x", "ppc64le"],
+          "description": "Target CPU architecture."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Metadata": {
+      "type": "object",
+      "description": "Supplementary metadata for discovery, categorization, and provenance.",
+      "properties": {
+        "labels": {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 63,
+            "pattern": "^[a-zA-Z0-9._\\-/]+$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "description": "Key-value pairs for organizational classification. Keys must match [a-zA-Z0-9._-/]+, max 63 chars. Values max 256 chars. Maximum 64 labels."
+        },
+        "tags": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+          },
+          "uniqueItems": true,
+          "description": "Freeform tags for discovery. Lowercase alphanumeric with hyphens, max 64 chars each, maximum 32 tags."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["conversational", "coding", "data-analysis", "research", "automation", "security", "devops", "creative", "education", "other"],
+          "description": "Primary category for classification."
+        },
+        "authors": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/Author"
+          },
+          "description": "List of artifact authors or maintainers."
+        },
+        "license": {
+          "type": "string",
+          "description": "SPDX license identifier (e.g., 'Apache-2.0', 'MIT')."
+        },
+        "repository": {
+          "$ref": "#/$defs/Repository",
+          "description": "Source code repository."
+        },
+        "websiteUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Project website URL."
+        },
+        "documentation": {
+          "type": "string",
+          "format": "uri",
+          "description": "Documentation URL."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of initial creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of last update."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Repository": {
+      "type": "object",
+      "description": "Source code repository reference.",
+      "required": ["url"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Repository URL."
+        },
+        "source": {
+          "type": "string",
+          "enum": ["github", "gitlab", "bitbucket", "other"],
+          "description": "Repository hosting platform."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Author": {
+      "type": "object",
+      "description": "Author or maintainer of the artifact.",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Author display name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Author email address."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Author URL (homepage, GitHub profile)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "EvalBaseline": {
+      "type": "object",
+      "description": "Evaluation baseline requirements for promotion gates.",
+      "properties": {
+        "minimumScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum overall evaluation score required (0-1)."
+        },
+        "requiredBenchmarks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Benchmark names that must have results before promotion."
+        },
+        "evaluationCadence": {
+          "type": "string",
+          "enum": ["on-publish", "on-promote", "scheduled", "manual"],
+          "description": "When evaluations should be run."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Deprecation": {
+      "type": "object",
+      "description": "Deprecation notice for artifacts with status 'deprecated'.",
+      "required": ["reason"],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "description": "Why the artifact is deprecated."
+        },
+        "alternative": {
+          "type": "string",
+          "description": "Recommended replacement artifact (name@version)."
+        },
+        "deadline": {
+          "type": "string",
+          "format": "date-time",
+          "description": "RFC 3339 timestamp after which the artifact may be archived."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

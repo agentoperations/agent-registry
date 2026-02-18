@@ -1,0 +1,390 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentregistry.dev/schemas/provenance.schema.json",
+  "title": "Provenance",
+  "description": "Schema for supply-chain provenance metadata following SLSA and in-toto frameworks. Captures build provenance, code signatures, SBOM references, and agent-specific authorship provenance.",
+  "type": "object",
+  "properties": {
+    "slsa": {
+      "$ref": "#/$defs/SLSAProvenance",
+      "description": "SLSA (Supply-chain Levels for Software Artifacts) provenance information."
+    },
+    "buildProvenance": {
+      "$ref": "#/$defs/InTotoStatement",
+      "description": "Build provenance in in-toto statement format."
+    },
+    "signatures": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SigstoreSignature"
+      },
+      "description": "Sigstore-compatible code and artifact signatures."
+    },
+    "sbom": {
+      "$ref": "#/$defs/SBOMReference",
+      "description": "Reference to the Software Bill of Materials."
+    },
+    "promptAuthorship": {
+      "$ref": "#/$defs/PromptAuthorship",
+      "description": "Agent-specific: provenance of system and user prompts."
+    },
+    "modelSelectionProvenance": {
+      "$ref": "#/$defs/ModelSelectionProvenance",
+      "description": "Agent-specific: rationale and audit trail for model selection."
+    },
+    "toolVerificationStatus": {
+      "$ref": "#/$defs/ToolVerificationStatus",
+      "description": "Agent-specific: verification status of tools used by the agent."
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "SLSAProvenance": {
+      "type": "object",
+      "description": "SLSA provenance metadata indicating supply-chain security level.",
+      "required": ["level"],
+      "properties": {
+        "level": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4,
+          "description": "SLSA level (0-4). Level 0 means no provenance; Level 4 means hermetic, reproducible builds with two-party review."
+        },
+        "buildType": {
+          "type": "string",
+          "format": "uri",
+          "description": "URI identifying the build type (e.g., 'https://slsa.dev/container-based-build/v0.1')."
+        },
+        "builder": {
+          "$ref": "#/$defs/Builder",
+          "description": "Identity and trust level of the build system."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Builder": {
+      "type": "object",
+      "description": "Build system identity.",
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uri",
+          "description": "URI identifying the build system (e.g., 'https://github.com/actions/runner')."
+        },
+        "version": {
+          "type": "string",
+          "description": "Version of the builder."
+        },
+        "builderDependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceDescriptor"
+          },
+          "description": "Dependencies of the builder itself."
+        }
+      },
+      "additionalProperties": false
+    },
+    "InTotoStatement": {
+      "type": "object",
+      "description": "In-toto attestation statement for build provenance.",
+      "required": ["_type", "subject", "predicateType", "predicate"],
+      "properties": {
+        "_type": {
+          "type": "string",
+          "const": "https://in-toto.io/Statement/v1",
+          "description": "In-toto statement type identifier."
+        },
+        "subject": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceDescriptor"
+          },
+          "minItems": 1,
+          "description": "Artifacts this provenance applies to."
+        },
+        "predicateType": {
+          "type": "string",
+          "format": "uri",
+          "description": "URI identifying the predicate type (e.g., 'https://slsa.dev/provenance/v1')."
+        },
+        "predicate": {
+          "type": "object",
+          "description": "Predicate-specific content. Structure depends on predicateType.",
+          "properties": {
+            "buildDefinition": {
+              "$ref": "#/$defs/BuildDefinition",
+              "description": "Definition of the build process."
+            },
+            "runDetails": {
+              "$ref": "#/$defs/RunDetails",
+              "description": "Details of the specific build run."
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "ResourceDescriptor": {
+      "type": "object",
+      "description": "Identifies a specific artifact or resource.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Resource name or path."
+        },
+        "uri": {
+          "type": "string",
+          "format": "uri",
+          "description": "URI of the resource."
+        },
+        "digest": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Mapping of hash algorithm to digest value (e.g., {'sha256': 'abc123...'})."
+        }
+      },
+      "additionalProperties": false
+    },
+    "BuildDefinition": {
+      "type": "object",
+      "description": "Definition of the build process.",
+      "properties": {
+        "buildType": {
+          "type": "string",
+          "format": "uri",
+          "description": "URI identifying the build type."
+        },
+        "externalParameters": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Parameters from external sources that influenced the build."
+        },
+        "internalParameters": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Builder-controlled parameters."
+        },
+        "resolvedDependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceDescriptor"
+          },
+          "description": "Dependencies resolved during the build."
+        }
+      },
+      "additionalProperties": false
+    },
+    "RunDetails": {
+      "type": "object",
+      "description": "Details of a specific build run.",
+      "properties": {
+        "builder": {
+          "$ref": "#/$defs/Builder",
+          "description": "Builder that performed this run."
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "invocationId": {
+              "type": "string",
+              "description": "Unique identifier for this build invocation."
+            },
+            "startedOn": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Timestamp when the build started."
+            },
+            "finishedOn": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Timestamp when the build finished."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "SigstoreSignature": {
+      "type": "object",
+      "description": "Sigstore-compatible artifact signature.",
+      "required": ["keyId", "signature"],
+      "properties": {
+        "keyId": {
+          "type": "string",
+          "description": "Identifier for the signing key (e.g., Fulcio certificate fingerprint)."
+        },
+        "signature": {
+          "type": "string",
+          "description": "Base64-encoded signature."
+        },
+        "certificate": {
+          "type": "string",
+          "description": "Base64-encoded Fulcio signing certificate (PEM)."
+        },
+        "rekorLogId": {
+          "type": "string",
+          "description": "Rekor transparency log entry UUID for verification."
+        },
+        "rekorLogIndex": {
+          "type": "integer",
+          "description": "Rekor transparency log index."
+        },
+        "timestampVerificationData": {
+          "type": "object",
+          "properties": {
+            "rfc3161Timestamps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "signedTimestamp": {
+                    "type": "string",
+                    "description": "Base64-encoded RFC 3161 timestamp."
+                  }
+                },
+                "additionalProperties": false
+              },
+              "description": "RFC 3161 signed timestamps."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Timestamp verification data from a Timestamp Authority."
+        }
+      },
+      "additionalProperties": false
+    },
+    "SBOMReference": {
+      "type": "object",
+      "description": "Reference to a Software Bill of Materials document.",
+      "required": ["format", "uri"],
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": ["SPDX", "CycloneDX"],
+          "description": "SBOM standard used."
+        },
+        "uri": {
+          "type": "string",
+          "format": "uri",
+          "description": "URI where the SBOM document is stored."
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "description": "Content digest of the SBOM document for integrity verification."
+        }
+      },
+      "additionalProperties": false
+    },
+    "PromptAuthorship": {
+      "type": "object",
+      "description": "Agent-specific provenance tracking for prompt authorship.",
+      "properties": {
+        "author": {
+          "type": "string",
+          "description": "Identity of the prompt author."
+        },
+        "source": {
+          "type": "string",
+          "enum": ["human-authored", "ai-generated", "hybrid", "template"],
+          "description": "How the prompt was created."
+        },
+        "reviewedBy": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Identities of reviewers who approved the prompt."
+        },
+        "lastModified": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the prompt was last modified."
+        },
+        "contentHash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "description": "Hash of the prompt content for change tracking."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ModelSelectionProvenance": {
+      "type": "object",
+      "description": "Agent-specific provenance for model selection decisions.",
+      "properties": {
+        "selectedModel": {
+          "type": "string",
+          "description": "The model that was selected."
+        },
+        "candidatesEvaluated": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Models considered during selection."
+        },
+        "selectionCriteria": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Criteria used for selection (e.g., 'latency', 'cost', 'accuracy', 'safety')."
+        },
+        "evaluationDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the model evaluation was performed."
+        },
+        "approvedBy": {
+          "type": "string",
+          "description": "Who approved the model selection."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolVerificationStatus": {
+      "type": "object",
+      "description": "Agent-specific verification status for tools used by the agent.",
+      "properties": {
+        "verifiedTools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolVerification"
+          },
+          "description": "Tools that have been verified."
+        },
+        "verificationPolicy": {
+          "type": "string",
+          "enum": ["all-verified", "best-effort", "none"],
+          "description": "Policy for tool verification."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolVerification": {
+      "type": "object",
+      "description": "Verification record for a single tool.",
+      "required": ["name", "verified"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Tool name."
+        },
+        "verified": {
+          "type": "boolean",
+          "description": "Whether the tool passed verification."
+        },
+        "verifiedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the tool was last verified."
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "description": "Digest of the verified tool artifact."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

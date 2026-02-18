@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentregistry.dev/schemas/trust-signals.schema.json",
+  "title": "Trust Signals",
+  "description": "Schema for computed trust signals that combine provenance, evaluation, code health, publisher reputation, community feedback, and operational metrics into a composite trust score.",
+  "type": "object",
+  "required": ["compositeScore", "components", "calculatedAt"],
+  "properties": {
+    "compositeScore": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Weighted composite trust score between 0 (no trust) and 1 (full trust). Computed from all component scores."
+    },
+    "components": {
+      "$ref": "#/$defs/TrustComponents",
+      "description": "Individual trust signal components with their scores, weights, and details."
+    },
+    "overrides": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TrustOverride"
+      },
+      "description": "Manual adjustments to the computed trust score, with audit trail."
+    },
+    "calculatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the trust score was last calculated."
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "TrustComponents": {
+      "type": "object",
+      "description": "The six trust signal components. Weights must sum to 1.0.",
+      "required": ["provenance", "evaluation", "codeHealth", "publisherReputation", "community", "operational"],
+      "properties": {
+        "provenance": {
+          "allOf": [{ "$ref": "#/$defs/TrustComponent" }],
+          "description": "Trust derived from supply-chain provenance (SLSA level, signatures, SBOM). Weight: 0.25.",
+          "properties": {
+            "weight": { "const": 0.25 },
+            "details": {
+              "$ref": "#/$defs/ProvenanceDetails"
+            }
+          }
+        },
+        "evaluation": {
+          "allOf": [{ "$ref": "#/$defs/TrustComponent" }],
+          "description": "Trust derived from evaluation results and benchmark performance. Weight: 0.25.",
+          "properties": {
+            "weight": { "const": 0.25 },
+            "details": {
+              "$ref": "#/$defs/EvaluationDetails"
+            }
+          }
+        },
+        "codeHealth": {
+          "allOf": [{ "$ref": "#/$defs/TrustComponent" }],
+          "description": "Trust derived from code quality metrics (test coverage, linting, vulnerability scanning). Weight: 0.20.",
+          "properties": {
+            "weight": { "const": 0.20 },
+            "details": {
+              "$ref": "#/$defs/CodeHealthDetails"
+            }
+          }
+        },
+        "publisherReputation": {
+          "allOf": [{ "$ref": "#/$defs/TrustComponent" }],
+          "description": "Trust derived from the publisher's track record and verification status. Weight: 0.15.",
+          "properties": {
+            "weight": { "const": 0.15 },
+            "details": {
+              "$ref": "#/$defs/PublisherReputationDetails"
+            }
+          }
+        },
+        "community": {
+          "allOf": [{ "$ref": "#/$defs/TrustComponent" }],
+          "description": "Trust derived from community adoption and feedback. Weight: 0.10.",
+          "properties": {
+            "weight": { "const": 0.10 },
+            "details": {
+              "$ref": "#/$defs/CommunityDetails"
+            }
+          }
+        },
+        "operational": {
+          "allOf": [{ "$ref": "#/$defs/TrustComponent" }],
+          "description": "Trust derived from runtime operational metrics (uptime, error rates). Weight: 0.05.",
+          "properties": {
+            "weight": { "const": 0.05 },
+            "details": {
+              "$ref": "#/$defs/OperationalDetails"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "TrustComponent": {
+      "type": "object",
+      "description": "A single trust signal component with score, weight, and metadata.",
+      "required": ["score", "weight", "lastUpdated"],
+      "properties": {
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Component score between 0 and 1."
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Weight of this component in the composite score."
+        },
+        "details": {
+          "type": "object",
+          "description": "Component-specific detail fields.",
+          "additionalProperties": true
+        },
+        "lastUpdated": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when this component was last computed."
+        }
+      }
+    },
+    "ProvenanceDetails": {
+      "type": "object",
+      "description": "Detail fields for the provenance trust component.",
+      "properties": {
+        "slsaLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4,
+          "description": "SLSA level achieved."
+        },
+        "signatureVerified": {
+          "type": "boolean",
+          "description": "Whether artifact signatures are valid."
+        },
+        "sbomAvailable": {
+          "type": "boolean",
+          "description": "Whether an SBOM is available and valid."
+        },
+        "reproducibleBuild": {
+          "type": "boolean",
+          "description": "Whether the build is reproducible."
+        }
+      },
+      "additionalProperties": false
+    },
+    "EvaluationDetails": {
+      "type": "object",
+      "description": "Detail fields for the evaluation trust component.",
+      "properties": {
+        "benchmarkCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of benchmarks evaluated against."
+        },
+        "passingRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Fraction of evaluations that passed."
+        },
+        "lastEvaluated": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the most recent evaluation was performed."
+        },
+        "evaluationFreshness": {
+          "type": "string",
+          "enum": ["current", "stale", "expired"],
+          "description": "Whether evaluations are current relative to the artifact version."
+        }
+      },
+      "additionalProperties": false
+    },
+    "CodeHealthDetails": {
+      "type": "object",
+      "description": "Detail fields for the code health trust component.",
+      "properties": {
+        "testCoverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Test coverage as a fraction (0-1)."
+        },
+        "lintingPassed": {
+          "type": "boolean",
+          "description": "Whether the code passes linting checks."
+        },
+        "vulnerabilities": {
+          "type": "object",
+          "properties": {
+            "critical": { "type": "integer", "minimum": 0, "description": "Count of critical vulnerabilities." },
+            "high": { "type": "integer", "minimum": 0, "description": "Count of high vulnerabilities." },
+            "medium": { "type": "integer", "minimum": 0, "description": "Count of medium vulnerabilities." },
+            "low": { "type": "integer", "minimum": 0, "description": "Count of low vulnerabilities." }
+          },
+          "additionalProperties": false,
+          "description": "Vulnerability counts by severity."
+        },
+        "dependencyFreshness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Fraction of dependencies that are up-to-date."
+        }
+      },
+      "additionalProperties": false
+    },
+    "PublisherReputationDetails": {
+      "type": "object",
+      "description": "Detail fields for the publisher reputation trust component.",
+      "properties": {
+        "verified": {
+          "type": "boolean",
+          "description": "Whether the publisher's identity has been verified."
+        },
+        "publishedArtifactCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of artifacts published by this publisher."
+        },
+        "accountAge": {
+          "type": "string",
+          "description": "How long the publisher account has existed (e.g., '2y3m')."
+        },
+        "incidentHistory": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of security incidents associated with this publisher."
+        }
+      },
+      "additionalProperties": false
+    },
+    "CommunityDetails": {
+      "type": "object",
+      "description": "Detail fields for the community trust component.",
+      "properties": {
+        "downloads": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total download count."
+        },
+        "stars": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Community star/like count."
+        },
+        "activeUsers": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of active users in the last 30 days."
+        },
+        "issueResponseTime": {
+          "type": "string",
+          "description": "Median time to respond to issues (e.g., '4h', '2d')."
+        }
+      },
+      "additionalProperties": false
+    },
+    "OperationalDetails": {
+      "type": "object",
+      "description": "Detail fields for the operational trust component.",
+      "properties": {
+        "uptime": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Uptime percentage as a fraction (0-1)."
+        },
+        "errorRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Error rate as a fraction (0-1)."
+        },
+        "medianLatency": {
+          "type": "string",
+          "description": "Median response latency (e.g., '120ms', '2s')."
+        },
+        "p99Latency": {
+          "type": "string",
+          "description": "99th percentile response latency."
+        }
+      },
+      "additionalProperties": false
+    },
+    "TrustOverride": {
+      "type": "object",
+      "description": "Manual adjustment to a trust score with audit trail.",
+      "required": ["component", "adjustment", "reason", "appliedBy", "appliedAt"],
+      "properties": {
+        "component": {
+          "type": "string",
+          "enum": ["provenance", "evaluation", "codeHealth", "publisherReputation", "community", "operational", "composite"],
+          "description": "Which component (or composite score) is being overridden."
+        },
+        "adjustment": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1,
+          "description": "Score adjustment (can be positive or negative)."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Human-readable justification for the override."
+        },
+        "appliedBy": {
+          "type": "string",
+          "description": "Identity of the person or system that applied the override."
+        },
+        "appliedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when the override was applied."
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Optional expiration time for the override."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

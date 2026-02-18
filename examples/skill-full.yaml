@@ -1,0 +1,155 @@
+# Agent Registry Spec — Full Skill
+#
+# Demonstrates a fully-specified skill with all optional fields.
+# This "incident-response" skill includes content (scripts, references, assets,
+# triggerPhrases), a BOM declaring its own dependencies (other skills, tool
+# requirements, model requirements), full metadata, provenance, and trust signals.
+#
+# All fields conform to the JSON schemas in ../schemas/.
+
+kind: skill
+apiVersion: v1alpha1
+
+identity:
+  name: incident-response
+  version: 2.1.0
+  title: Incident Response Playbook
+  description: >-
+    Structured incident response procedures for production systems.
+    Covers detection, triage, containment, remediation, and post-mortem.
+    Integrates with alerting and monitoring tools via MCP servers.
+
+content:
+  entrypoint: SKILL.md
+  scripts:
+    - scripts/classify_severity.py
+    - scripts/gather_diagnostics.sh
+    - scripts/generate_postmortem.py
+  references:
+    - https://sre.google/sre-book/managing-incidents/
+    - https://response.pagerduty.com/
+  assets:
+    - assets/postmortem-template.md
+    - assets/runbook-template.md
+  triggerPhrases:
+    - incident response
+    - production outage
+    - page received
+    - severity classification
+    - post-mortem
+
+bom:
+  dependencies:
+    - name: k8s-troubleshooting
+      version: ">=1.0.0"
+  toolRequirements:
+    - type: mcp-server
+      name: alertmanager-mcp
+      version: ">=1.0.0"
+      required: true
+    - type: mcp-server
+      name: prometheus-mcp
+      version: ">=2.0.0"
+      required: true
+  modelRequirements:
+    - provider: any
+      name: any
+      role: primary
+
+metadata:
+  labels:
+    team: sre
+    domain: incident-management
+  tags:
+    - incident-response
+    - sre
+    - on-call
+    - runbooks
+    - post-mortem
+  category: operations/incident-management
+  authors:
+    - name: SRE Team
+      email: sre@example.com
+  license: Apache-2.0
+  repository: https://github.com/example-org/incident-response-skill
+
+artifacts:
+  - registry: ghcr.io
+    repository: example-org/incident-response-skill
+    tag: "2.1.0"
+    digest: sha256:7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730
+
+provenance:
+  slsa:
+    level: 2
+    buildType: https://slsa.dev/container/v1
+    builder:
+      id: https://github.com/example-org/incident-response-skill/.github/workflows/release.yaml
+  signatures:
+    - keyId: fulcio:sre@example.com
+      signature: MEQCIH3x...base64...==
+
+trustSignals:
+  compositeScore: 0.79
+  calculatedAt: "2026-01-25T12:00:00Z"
+  components:
+    provenance:
+      score: 0.80
+      weight: 0.25
+      lastUpdated: "2026-01-25T12:00:00Z"
+      details:
+        slsaLevel: 2
+        signatureVerified: true
+        sbomAvailable: false
+        reproducibleBuild: false
+    evaluation:
+      score: 0.75
+      weight: 0.25
+      lastUpdated: "2026-01-20T09:00:00Z"
+      details:
+        benchmarkCount: 2
+        passingRate: 0.75
+        lastEvaluated: "2026-01-20T09:00:00Z"
+        evaluationFreshness: current
+    codeHealth:
+      score: 0.72
+      weight: 0.20
+      lastUpdated: "2026-01-25T12:00:00Z"
+      details:
+        testCoverage: 0.72
+        lintingPassed: true
+        vulnerabilities:
+          critical: 0
+          high: 0
+          medium: 1
+          low: 3
+        dependencyFreshness: 0.88
+    publisherReputation:
+      score: 0.85
+      weight: 0.15
+      lastUpdated: "2026-01-25T12:00:00Z"
+      details:
+        verified: true
+        publishedArtifactCount: 12
+        accountAge: 2y8m
+        incidentHistory: 0
+    community:
+      score: 0.68
+      weight: 0.10
+      lastUpdated: "2026-01-25T12:00:00Z"
+      details:
+        downloads: 3200
+        stars: 95
+        activeUsers: 42
+        issueResponseTime: 8h
+    operational:
+      score: 0.90
+      weight: 0.05
+      lastUpdated: "2026-01-25T12:00:00Z"
+      details:
+        uptime: 1.0
+        errorRate: 0.0
+        medianLatency: 50ms
+        p99Latency: 200ms
+
+status: published

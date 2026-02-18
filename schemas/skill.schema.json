@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentregistry.dev/schemas/skill.schema.json",
+  "title": "Skill Artifact",
+  "description": "Extension schema for artifacts of kind 'skill'. Skills are portable prompt-and-script bundles that agents can incorporate. Skills have no runtime of their own -- they are consumed by agents or AI-powered IDEs.",
+  "type": "object",
+  "properties": {
+    "content": {
+      "$ref": "#/$defs/SkillContent",
+      "description": "Content definition for the skill, including entrypoint, scripts, references, assets, and trigger phrases (Tier 1, optional)."
+    },
+    "bom": {
+      "$ref": "bom.schema.json#/$defs/SkillBOM",
+      "description": "Skill-specific Bill of Materials describing dependencies, tool requirements, and model requirements (Tier 1 optional, Tier 2 required)."
+    }
+  },
+  "$defs": {
+    "SkillContent": {
+      "type": "object",
+      "description": "Content bundle for a skill artifact.",
+      "required": ["entrypoint"],
+      "properties": {
+        "entrypoint": {
+          "type": "string",
+          "description": "Path to the primary skill definition file (typically 'SKILL.md'). This file contains the prompt instructions that define the skill's behavior."
+        },
+        "scripts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Script"
+          },
+          "description": "Supporting scripts used by the skill."
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Reference"
+          },
+          "description": "External or bundled reference materials."
+        },
+        "assets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Asset"
+          },
+          "description": "Static assets bundled with the skill (templates, config files, data files)."
+        },
+        "triggerPhrases": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "uniqueItems": true,
+          "description": "Natural-language phrases that should trigger activation of this skill. Used for skill discovery and routing. Maximum 20 phrases, each max 256 characters."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Script": {
+      "type": "object",
+      "description": "A supporting script included in the skill bundle.",
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Relative path to the script file."
+        },
+        "description": {
+          "type": "string",
+          "description": "What the script does."
+        },
+        "interpreter": {
+          "type": "string",
+          "description": "Script interpreter (e.g., 'bash', 'python3', 'node')."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Reference": {
+      "type": "object",
+      "description": "An external or bundled reference material.",
+      "required": ["title"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Reference title."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "External URL (mutually exclusive with 'path')."
+        },
+        "path": {
+          "type": "string",
+          "description": "Bundled file path (mutually exclusive with 'url')."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["documentation", "guide", "example", "specification", "other"],
+          "description": "Reference type."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Asset": {
+      "type": "object",
+      "description": "A static asset bundled with the skill.",
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Relative path to the asset."
+        },
+        "mediaType": {
+          "type": "string",
+          "description": "MIME type of the asset (e.g., 'text/markdown', 'application/json')."
+        },
+        "description": {
+          "type": "string",
+          "description": "Asset description."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,2246 @@
+openapi: 3.1.0
+info:
+  title: Agent Registry API
+  version: 1.0.0
+  description: |
+    Vendor-neutral registry for AI agent artifacts. The Agent Registry provides
+    a centralized, standardized way to publish, discover, and manage AI agents,
+    skills, and MCP servers with built-in lifecycle management, provenance
+    tracking, and trust scoring.
+
+    ## Artifact Kinds
+
+    The registry manages three kinds of artifacts:
+
+    - **agents** -- Autonomous AI agents with tool-use capabilities
+    - **skills** -- Reusable capability bundles that agents can compose
+    - **servers** -- MCP (Model Context Protocol) servers providing tools and resources
+
+    ## Lifecycle
+
+    All artifacts follow a promotion-based lifecycle:
+
+    `draft` -> `evaluated` -> `approved` -> `published` -> `deprecated` -> `archived`
+
+    ## Authentication
+
+    The API supports Bearer token, API key, and OAuth2 authentication.
+  contact:
+    name: Agent Registry
+    url: https://github.com/agentregistry-dev/agentregistry
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  - url: /api/v1
+    description: Default API base path
+
+tags:
+  - name: Artifacts
+    description: CRUD operations for registry artifacts (agents, skills, servers)
+  - name: Promotion
+    description: Lifecycle promotion of artifacts through status stages
+  - name: Evaluation
+    description: Attach and query evaluation records for artifacts
+  - name: Provenance
+    description: Supply-chain attestations and provenance metadata
+  - name: Trust
+    description: Computed trust signals for artifacts
+  - name: Discovery
+    description: Cross-kind semantic search and agent card endpoints
+  - name: Federation
+    description: Registry peering, sync, and discovery-document endpoints
+  - name: Skills
+    description: Skill-specific endpoints (content bundles)
+  - name: Dependencies
+    description: Dependency graph resolution
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+paths:
+  # ---------------------------------------------------------------------------
+  # Artifact CRUD
+  # ---------------------------------------------------------------------------
+  /api/v1/{kind}:
+    get:
+      operationId: listArtifacts
+      summary: List artifacts
+      description: |
+        Returns a paginated list of artifacts of the specified kind.
+        Supports filtering by namespace, status, category, tags, and sorting.
+      tags: [Artifacts]
+      parameters:
+        - $ref: '#/components/parameters/Kind'
+        - $ref: '#/components/parameters/Namespace'
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/Tags'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Order'
+      responses:
+        '200':
+          description: Paginated list of artifacts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactListResponse'
+              example:
+                data:
+                  - metadata:
+                      name: weather-agent
+                      namespace: acme
+                      version: 1.2.0
+                      kind: agent
+                      status: published
+                      createdAt: "2025-06-01T12:00:00Z"
+                      updatedAt: "2025-06-15T09:30:00Z"
+                    spec:
+                      description: An agent that provides weather forecasts
+                      category: utilities
+                      tags: [weather, forecasting]
+                _meta:
+                  requestId: req-abc123
+                  timestamp: "2025-06-15T09:31:00Z"
+                  version: "1.0.0"
+                pagination:
+                  page: 1
+                  pageSize: 20
+                  total: 42
+                  totalPages: 3
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      operationId: createArtifact
+      summary: Create a new artifact
+      description: |
+        Creates a new artifact of the specified kind. The artifact is created
+        in `draft` status by default. The name and version must be unique
+        within the namespace.
+      tags: [Artifacts]
+      parameters:
+        - $ref: '#/components/parameters/Kind'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistryArtifact'
+      responses:
+        '201':
+          description: Artifact created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/{kind}/{name}:
+    get:
+      operationId: getArtifact
+      summary: Get latest version of an artifact
+      description: |
+        Retrieves the latest published version of the named artifact.
+        If no published version exists, returns 404.
+      tags: [Artifacts]
+      parameters:
+        - $ref: '#/components/parameters/Kind'
+        - $ref: '#/components/parameters/Name'
+      responses:
+        '200':
+          description: Artifact details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/{kind}/{name}/versions:
+    get:
+      operationId: listArtifactVersions
+      summary: List all versions of an artifact
+      description: |
+        Returns all versions of the named artifact, ordered by version
+        number descending. Includes both published and draft versions
+        for authorized users.
+      tags: [Artifacts]
+      parameters:
+        - $ref: '#/components/parameters/Kind'
+        - $ref: '#/components/parameters/Name'
+      responses:
+        '200':
+          description: List of artifact versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/{kind}/{name}/versions/{version}:
+    get:
+      operationId: getArtifactVersion
+      summary: Get a specific version of an artifact
+      description: |
+        Retrieves a specific version of the named artifact. Use the
+        special version string `latest` to get the most recent version.
+      tags: [Artifacts]
+      parameters:
+        - $ref: '#/components/parameters/Kind'
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Version'
+      responses:
+        '200':
+          description: Artifact version details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      operationId: updateArtifactVersion
+      summary: Update an artifact version
+      description: |
+        Updates an existing artifact version. Only artifacts in `draft`
+        status can be updated. Once an artifact has been promoted beyond
+        draft, it becomes immutable.
+      tags: [Artifacts]
+      parameters:
+        - $ref: '#/components/parameters/Kind'
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Version'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistryArtifact'
+      responses:
+        '200':
+          description: Artifact updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      operationId: deleteArtifactVersion
+      summary: Delete an artifact version
+      description: |
+        Permanently deletes an artifact version. Only artifacts in `draft`
+        status can be deleted. Published or promoted artifacts must first
+        be deprecated or archived.
+      tags: [Artifacts]
+      parameters:
+        - $ref: '#/components/parameters/Kind'
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Version'
+      responses:
+        '204':
+          description: Artifact deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ---------------------------------------------------------------------------
+  # Promotion
+  # ---------------------------------------------------------------------------
+  /api/v1/{kind}/{name}/versions/{version}/promote:
+    post:
+      operationId: promoteArtifact
+      summary: Promote an artifact to a new status
+      description: |
+        Promotes an artifact version to the specified target status.
+        Promotions must follow the valid lifecycle transitions:
+
+        - `draft` -> `evaluated`
+        - `evaluated` -> `approved`
+        - `approved` -> `published`
+        - `published` -> `deprecated`
+        - `deprecated` -> `archived`
+        - Any status -> `deprecated` (fast-track deprecation)
+
+        Each promotion is recorded in the artifact's audit trail.
+      tags: [Promotion]
+      parameters:
+        - $ref: '#/components/parameters/Kind'
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Version'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromotionRequest'
+            example:
+              targetStatus: published
+              reason: "Passed all evaluation benchmarks and security review"
+      responses:
+        '200':
+          description: Artifact promoted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ---------------------------------------------------------------------------
+  # Evaluation
+  # ---------------------------------------------------------------------------
+  /api/v1/{kind}/{name}/versions/{version}/evals:
+    post:
+      operationId: attachEvalRecord
+      summary: Attach an evaluation record
+      description: |
+        Attaches an evaluation record to an artifact version. Eval records
+        capture benchmark results, safety scores, and other quantitative
+        assessments. Multiple eval records can be attached to the same
+        artifact version.
+      tags: [Evaluation]
+      parameters:
+        - $ref: '#/components/parameters/Kind'
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Version'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvalRecord'
+            example:
+              benchmark: mmlu
+              evaluator: openai-evals
+              score: 0.87
+              metrics:
+                accuracy: 0.87
+                latency_p99_ms: 450
+              metadata:
+                model: gpt-4
+                dataset_version: "2025-01"
+              timestamp: "2025-06-15T10:00:00Z"
+      responses:
+        '201':
+          description: Eval record attached successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvalRecordResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    get:
+      operationId: listEvalRecords
+      summary: List evaluation records
+      description: |
+        Returns evaluation records attached to an artifact version.
+        Supports filtering by benchmark name, evaluator, and minimum score.
+      tags: [Evaluation]
+      parameters:
+        - $ref: '#/components/parameters/Kind'
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Version'
+        - name: benchmark
+          in: query
+          description: Filter by benchmark name
+          schema:
+            type: string
+          example: mmlu
+        - name: evaluator
+          in: query
+          description: Filter by evaluator identity
+          schema:
+            type: string
+          example: openai-evals
+        - name: minScore
+          in: query
+          description: Filter for records with score >= this value
+          schema:
+            type: number
+            format: double
+            minimum: 0
+            maximum: 1
+          example: 0.8
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: List of evaluation records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvalRecordListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ---------------------------------------------------------------------------
+  # Provenance
+  # ---------------------------------------------------------------------------
+  /api/v1/{kind}/{name}/versions/{version}/attestations:
+    post:
+      operationId: attachAttestation
+      summary: Attach a provenance attestation
+      description: |
+        Attaches a supply-chain attestation to an artifact version.
+        Attestations follow the in-toto attestation framework and can
+        include SLSA provenance, code review evidence, and vulnerability
+        scan results.
+      tags: [Provenance]
+      parameters:
+        - $ref: '#/components/parameters/Kind'
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Version'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Attestation'
+            example:
+              predicateType: "https://slsa.dev/provenance/v1"
+              predicate:
+                buildType: "https://github.com/actions/runner"
+                builder:
+                  id: "https://github.com/actions/runner"
+                invocation:
+                  configSource:
+                    uri: "git+https://github.com/acme/weather-agent@refs/heads/main"
+                    digest:
+                      sha256: "abc123def456"
+              signature:
+                keyid: "projects/acme/locations/global/keyRings/prod/cryptoKeys/signing"
+                sig: "MEUCIQDx..."
+      responses:
+        '201':
+          description: Attestation attached successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttestationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    get:
+      operationId: listAttestations
+      summary: List provenance attestations
+      description: |
+        Returns all attestations attached to an artifact version,
+        including SLSA provenance and other supply-chain metadata.
+      tags: [Provenance]
+      parameters:
+        - $ref: '#/components/parameters/Kind'
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Version'
+      responses:
+        '200':
+          description: List of attestations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttestationListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ---------------------------------------------------------------------------
+  # Trust
+  # ---------------------------------------------------------------------------
+  /api/v1/{kind}/{name}/versions/{version}/trust:
+    get:
+      operationId: getTrustSignals
+      summary: Get computed trust signals
+      description: |
+        Returns the computed trust signals for an artifact version.
+        Trust signals are derived from evaluation records, attestations,
+        provenance data, and community signals. The overall trust score
+        is a weighted composite of individual signal scores.
+      tags: [Trust]
+      parameters:
+        - $ref: '#/components/parameters/Kind'
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Version'
+      responses:
+        '200':
+          description: Trust signals for the artifact
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustSignalsResponse'
+              example:
+                data:
+                  overallScore: 0.82
+                  level: high
+                  signals:
+                    provenance:
+                      score: 0.95
+                      details:
+                        hasSlsaProvenance: true
+                        slsaLevel: 3
+                        sourceVerified: true
+                    evaluation:
+                      score: 0.87
+                      details:
+                        benchmarkCount: 3
+                        averageScore: 0.87
+                        lastEvalDate: "2025-06-15T10:00:00Z"
+                    security:
+                      score: 0.90
+                      details:
+                        vulnerabilityScanPassed: true
+                        codeReviewCompleted: true
+                    community:
+                      score: 0.55
+                      details:
+                        downloads: 1250
+                        stars: 45
+                  computedAt: "2025-06-15T12:00:00Z"
+                _meta:
+                  requestId: req-trust-456
+                  timestamp: "2025-06-15T12:00:01Z"
+                  version: "1.0.0"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ---------------------------------------------------------------------------
+  # Discovery
+  # ---------------------------------------------------------------------------
+  /api/v1/discover:
+    get:
+      operationId: discover
+      summary: Cross-kind semantic search
+      description: |
+        Searches across all artifact kinds (agents, skills, servers) using
+        semantic search. Returns ranked results with relevance scores.
+        Supports filtering by kind, namespace, category, tags, trust level,
+        and artifact status.
+      tags: [Discovery]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query text for semantic matching
+          schema:
+            type: string
+          example: "weather forecasting agent"
+        - name: kind
+          in: query
+          description: Filter results to a specific artifact kind
+          schema:
+            type: string
+            enum: [agents, skills, servers]
+        - $ref: '#/components/parameters/Namespace'
+        - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/Tags'
+        - name: minTrust
+          in: query
+          description: Minimum overall trust score (0.0 to 1.0)
+          schema:
+            type: number
+            format: double
+            minimum: 0
+            maximum: 1
+          example: 0.7
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: sort
+          in: query
+          description: Sort field for discovery results
+          schema:
+            type: string
+            enum: [relevance, trust, name, createdAt, updatedAt]
+            default: relevance
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoverResponse'
+              example:
+                data:
+                  - metadata:
+                      name: weather-agent
+                      namespace: acme
+                      version: 1.2.0
+                      kind: agent
+                      status: published
+                    spec:
+                      description: An agent that provides weather forecasts
+                    relevanceScore: 0.94
+                    trustScore: 0.82
+                  - metadata:
+                      name: geocoding-skill
+                      namespace: acme
+                      version: 2.0.1
+                      kind: skill
+                      status: published
+                    spec:
+                      description: Geocoding skill for location resolution
+                    relevanceScore: 0.71
+                    trustScore: 0.78
+                _meta:
+                  requestId: req-disc-789
+                  timestamp: "2025-06-15T12:05:00Z"
+                  version: "1.0.0"
+                pagination:
+                  page: 1
+                  pageSize: 20
+                  total: 2
+                  totalPages: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/agents/{name}/.well-known/agent.json:
+    get:
+      operationId: getAgentCard
+      summary: Get agent card (A2A protocol)
+      description: |
+        Returns the Agent Card for the named agent, following the
+        Agent-to-Agent (A2A) protocol specification. The agent card
+        contains the agent's capabilities, supported protocols, and
+        endpoint information needed for inter-agent communication.
+      tags: [Discovery]
+      parameters:
+        - $ref: '#/components/parameters/Name'
+      responses:
+        '200':
+          description: Agent card
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentCard'
+              example:
+                name: weather-agent
+                description: An agent that provides weather forecasts
+                url: "https://registry.example.com/api/v1/agents/weather-agent"
+                capabilities:
+                  streaming: true
+                  pushNotifications: false
+                skills:
+                  - name: get-weather
+                    description: Get current weather for a location
+                    inputSchema:
+                      type: object
+                      properties:
+                        location:
+                          type: string
+                      required: [location]
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ---------------------------------------------------------------------------
+  # Skill-specific
+  # ---------------------------------------------------------------------------
+  /api/v1/skills/{name}/versions/{version}/content:
+    get:
+      operationId: getSkillContent
+      summary: Download skill content bundle
+      description: |
+        Downloads the content bundle for a skill version as a
+        gzip-compressed tar archive. The archive contains the skill's
+        executable code, configuration, and any bundled resources.
+      tags: [Skills]
+      parameters:
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Version'
+      responses:
+        '200':
+          description: Skill content bundle
+          content:
+            application/gzip:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: Suggested filename for the download
+              example: 'attachment; filename="geocoding-skill-2.0.1.tar.gz"'
+            Content-Length:
+              schema:
+                type: integer
+              description: Size of the content bundle in bytes
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ---------------------------------------------------------------------------
+  # Dependency graph
+  # ---------------------------------------------------------------------------
+  /api/v1/{kind}/{name}/versions/{version}/dependencies:
+    get:
+      operationId: getDependencyGraph
+      summary: Get resolved dependency tree
+      description: |
+        Returns the resolved dependency tree for an artifact version.
+        Includes direct and optionally transitive dependencies with
+        their resolved versions and compatibility status.
+      tags: [Dependencies]
+      parameters:
+        - $ref: '#/components/parameters/Kind'
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Version'
+        - name: depth
+          in: query
+          description: |
+            Maximum depth to traverse. Use -1 for the full tree.
+          schema:
+            type: integer
+            default: -1
+          example: 3
+        - name: includeTransitive
+          in: query
+          description: Whether to include transitive dependencies
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Resolved dependency tree
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DependencyGraphResponse'
+              example:
+                data:
+                  artifact:
+                    name: weather-agent
+                    kind: agent
+                    version: 1.2.0
+                  dependencies:
+                    - name: geocoding-skill
+                      kind: skill
+                      version: 2.0.1
+                      versionConstraint: "^2.0.0"
+                      resolved: true
+                      dependencies: []
+                    - name: weather-mcp
+                      kind: server
+                      version: 3.1.0
+                      versionConstraint: ">=3.0.0"
+                      resolved: true
+                      dependencies:
+                        - name: http-client-skill
+                          kind: skill
+                          version: 1.5.2
+                          versionConstraint: "^1.5.0"
+                          resolved: true
+                          dependencies: []
+                _meta:
+                  requestId: req-dep-012
+                  timestamp: "2025-06-15T12:10:00Z"
+                  version: "1.0.0"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ---------------------------------------------------------------------------
+  # Federation
+  # ---------------------------------------------------------------------------
+  /.well-known/agent-registry.json:
+    get:
+      operationId: getRegistryDiscoveryDocument
+      summary: Registry discovery document
+      description: |
+        Returns the registry discovery document at the well-known
+        location. This document advertises the registry's capabilities,
+        supported API versions, and federation endpoints. Used by
+        other registries and clients for auto-configuration.
+      tags: [Federation]
+      security: []
+      responses:
+        '200':
+          description: Registry discovery document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistryDiscoveryDocument'
+              example:
+                registryName: "ACME Agent Registry"
+                registryUrl: "https://registry.acme.example.com"
+                apiVersion: "1.0.0"
+                apiBase: "/api/v1"
+                capabilities:
+                  federation: true
+                  semanticSearch: true
+                  trustScoring: true
+                  provenance: true
+                supportedKinds: [agents, skills, servers]
+                federationEndpoint: "/api/v1/federation"
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/federation/peers:
+    get:
+      operationId: listFederationPeers
+      summary: List registered federation peers
+      description: |
+        Returns the list of peer registries that this registry has
+        established federation relationships with.
+      tags: [Federation]
+      responses:
+        '200':
+          description: List of federation peers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PeerListResponse'
+              example:
+                data:
+                  - peerId: "peer-registry-east"
+                    registryUrl: "https://east.registry.example.com"
+                    name: "East Coast Registry"
+                    status: active
+                    lastSyncAt: "2025-06-15T11:00:00Z"
+                    artifactCount: 150
+                  - peerId: "peer-registry-eu"
+                    registryUrl: "https://eu.registry.example.com"
+                    name: "EU Registry"
+                    status: active
+                    lastSyncAt: "2025-06-15T10:30:00Z"
+                    artifactCount: 230
+                _meta:
+                  requestId: req-fed-001
+                  timestamp: "2025-06-15T12:15:00Z"
+                  version: "1.0.0"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      operationId: registerFederationPeer
+      summary: Register a federation peer
+      description: |
+        Registers a new peer registry for federation. The registry will
+        fetch the peer's discovery document to validate connectivity
+        and capabilities before establishing the relationship.
+      tags: [Federation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PeerRegistration'
+            example:
+              registryUrl: "https://partner.registry.example.com"
+              name: "Partner Registry"
+              apiKey: "fed-key-abc123"
+      responses:
+        '201':
+          description: Peer registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PeerResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/v1/federation/peers/{peerId}:
+    delete:
+      operationId: removeFederationPeer
+      summary: Remove a federation peer
+      description: |
+        Removes a peer registry from the federation. Artifacts
+        previously synced from this peer will be marked as stale.
+      tags: [Federation]
+      parameters:
+        - name: peerId
+          in: path
+          required: true
+          description: Unique identifier of the peer registry
+          schema:
+            type: string
+          example: peer-registry-east
+      responses:
+        '204':
+          description: Peer removed successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/federation/sync:
+    post:
+      operationId: triggerFederationSync
+      summary: Trigger sync with a peer
+      description: |
+        Triggers a synchronization with a registered peer registry.
+        The sync process fetches new and updated artifacts from the
+        peer since the last sync cursor. Use the cursor parameter
+        to resume from a specific point.
+      tags: [Federation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncRequest'
+            example:
+              peerId: "peer-registry-east"
+              cursor: "2025-06-15T10:00:00Z"
+      responses:
+        '200':
+          description: Sync completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncResponse'
+              example:
+                data:
+                  peerId: "peer-registry-east"
+                  artifactsSynced: 12
+                  artifactsUpdated: 3
+                  artifactsRemoved: 1
+                  newCursor: "2025-06-15T12:20:00Z"
+                  syncDurationMs: 2340
+                _meta:
+                  requestId: req-sync-005
+                  timestamp: "2025-06-15T12:20:02Z"
+                  version: "1.0.0"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# =============================================================================
+# Components
+# =============================================================================
+components:
+  # ---------------------------------------------------------------------------
+  # Security Schemes
+  # ---------------------------------------------------------------------------
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Bearer token authentication. Supports JWT tokens from
+        GitHub OAuth, GitHub Actions OIDC, generic OIDC providers,
+        or registry-issued tokens.
+
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key authentication for programmatic access.
+
+    OAuth2:
+      type: oauth2
+      description: OAuth2 authentication (optional).
+      flows:
+        authorizationCode:
+          authorizationUrl: https://github.com/login/oauth/authorize
+          tokenUrl: https://github.com/login/oauth/access_token
+          scopes:
+            read: Read access to registry artifacts
+            write: Write access to publish and manage artifacts
+            admin: Administrative operations
+
+  # ---------------------------------------------------------------------------
+  # Parameters
+  # ---------------------------------------------------------------------------
+  parameters:
+    Kind:
+      name: kind
+      in: path
+      required: true
+      description: The artifact kind
+      schema:
+        type: string
+        enum: [agents, skills, servers]
+      example: agents
+
+    Name:
+      name: name
+      in: path
+      required: true
+      description: |
+        Artifact name. May be namespace-qualified (e.g., `acme/weather-agent`)
+        and should be URL-encoded when the name contains slashes.
+      schema:
+        type: string
+        pattern: '^[a-z0-9]([a-z0-9._-]*[a-z0-9])?(/[a-z0-9]([a-z0-9._-]*[a-z0-9])?)?$'
+      example: acme/weather-agent
+
+    Version:
+      name: version
+      in: path
+      required: true
+      description: |
+        Semantic version string (e.g., `1.2.3`) or the special value
+        `latest` to reference the most recent version.
+      schema:
+        type: string
+      example: "1.2.0"
+
+    Namespace:
+      name: namespace
+      in: query
+      description: Filter by namespace
+      schema:
+        type: string
+      example: acme
+
+    Status:
+      name: status
+      in: query
+      description: Filter by artifact status
+      schema:
+        type: string
+        enum: [draft, evaluated, approved, published, deprecated, archived]
+      example: published
+
+    Category:
+      name: category
+      in: query
+      description: Filter by category
+      schema:
+        type: string
+      example: utilities
+
+    Tags:
+      name: tags
+      in: query
+      description: Comma-separated list of tags to filter by
+      schema:
+        type: string
+      example: "weather,forecasting"
+
+    Page:
+      name: page
+      in: query
+      description: Page number (1-based)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      example: 1
+
+    PageSize:
+      name: pageSize
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      example: 20
+
+    Sort:
+      name: sort
+      in: query
+      description: Field to sort by
+      schema:
+        type: string
+        enum: [name, createdAt, updatedAt, version]
+        default: name
+      example: updatedAt
+
+    Order:
+      name: order
+      in: query
+      description: Sort order
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+      example: desc
+
+  # ---------------------------------------------------------------------------
+  # Schemas
+  # ---------------------------------------------------------------------------
+  schemas:
+    # ---- Response Envelope ----
+    ResponseMeta:
+      type: object
+      properties:
+        requestId:
+          type: string
+          description: Unique identifier for this request
+          example: req-abc123
+        timestamp:
+          type: string
+          format: date-time
+          description: Server timestamp when the response was generated
+          example: "2025-06-15T12:00:00Z"
+        version:
+          type: string
+          description: API version
+          example: "1.0.0"
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Current page number
+          example: 1
+        pageSize:
+          type: integer
+          description: Number of items per page
+          example: 20
+        total:
+          type: integer
+          description: Total number of items across all pages
+          example: 42
+        totalPages:
+          type: integer
+          description: Total number of pages
+          example: 3
+        cursor:
+          type: string
+          description: Opaque cursor for cursor-based pagination
+          example: "eyJpZCI6MTIzfQ"
+
+    # ---- Error ----
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: integer
+              description: HTTP status code
+              example: 400
+            message:
+              type: string
+              description: Human-readable error message
+              example: "Invalid artifact name format"
+            details:
+              type: array
+              description: Detailed validation errors
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    description: Field that caused the error
+                    example: metadata.name
+                  message:
+                    type: string
+                    description: Error description for this field
+                    example: "Name must match pattern [a-z0-9][a-z0-9._-]*"
+        _meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    # ---- Core Artifact ----
+    RegistryArtifact:
+      type: object
+      required: [metadata, spec]
+      description: |
+        A registry artifact representing an agent, skill, or MCP server.
+        This is the canonical representation used for create and update operations.
+      properties:
+        metadata:
+          $ref: '#/components/schemas/ArtifactMetadata'
+        spec:
+          $ref: '#/components/schemas/ArtifactSpec'
+        bom:
+          $ref: '#/components/schemas/BOM'
+
+    ArtifactMetadata:
+      type: object
+      required: [name, version, kind]
+      description: Metadata that identifies and classifies the artifact.
+      properties:
+        name:
+          type: string
+          description: |
+            Unique name of the artifact within its namespace.
+            May include a namespace prefix separated by `/`.
+          pattern: '^[a-z0-9]([a-z0-9._-]*[a-z0-9])?(/[a-z0-9]([a-z0-9._-]*[a-z0-9])?)?$'
+          example: acme/weather-agent
+        namespace:
+          type: string
+          description: Organizational namespace for the artifact
+          example: acme
+        version:
+          type: string
+          description: Semantic version string
+          pattern: '^\d+\.\d+\.\d+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?(\+[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$'
+          example: "1.2.0"
+        kind:
+          type: string
+          enum: [agent, skill, server]
+          description: The artifact kind
+          example: agent
+        status:
+          type: string
+          enum: [draft, evaluated, approved, published, deprecated, archived]
+          description: Current lifecycle status
+          default: draft
+          example: published
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+          description: Key-value labels for organizational grouping
+          example:
+            team: platform
+            tier: production
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+          description: Non-identifying metadata annotations
+          example:
+            contact: team-platform@acme.com
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the artifact was created (server-assigned)
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the artifact was last updated (server-assigned)
+          readOnly: true
+
+    ArtifactSpec:
+      type: object
+      description: |
+        The specification of the artifact. Fields vary by kind but share
+        a common base. Kind-specific fields are included via composition.
+      properties:
+        description:
+          type: string
+          description: Human-readable description of the artifact
+          example: An agent that provides weather forecasts for any location
+        category:
+          type: string
+          description: Classification category
+          example: utilities
+        tags:
+          type: array
+          items:
+            type: string
+          description: Searchable tags
+          example: [weather, forecasting, api]
+        repository:
+          $ref: '#/components/schemas/Repository'
+        website:
+          type: string
+          format: uri
+          description: Project website URL
+          example: "https://github.com/acme/weather-agent"
+        license:
+          type: string
+          description: SPDX license identifier
+          example: Apache-2.0
+        authors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Author'
+        # Kind-specific spec extensions
+        agent:
+          $ref: '#/components/schemas/AgentSpec'
+        skill:
+          $ref: '#/components/schemas/SkillSpec'
+        server:
+          $ref: '#/components/schemas/McpServerSpec'
+
+    # ---- Kind-specific Specs ----
+    AgentSpec:
+      type: object
+      description: Agent-specific specification fields
+      properties:
+        framework:
+          type: string
+          description: Agent framework used
+          example: google-adk
+        modelProvider:
+          type: string
+          description: Default model provider
+          example: openai
+        modelName:
+          type: string
+          description: Default model name
+          example: gpt-4
+        language:
+          type: string
+          description: Implementation language
+          example: python
+        image:
+          type: string
+          description: Container image reference
+          example: ghcr.io/acme/weather-agent:1.2.0
+        mcpServers:
+          type: array
+          description: MCP servers this agent depends on
+          items:
+            $ref: '#/components/schemas/McpServerRef'
+        remotes:
+          type: array
+          description: Remote transport endpoints
+          items:
+            $ref: '#/components/schemas/Transport'
+        a2aCard:
+          $ref: '#/components/schemas/AgentCard'
+
+    SkillSpec:
+      type: object
+      description: Skill-specific specification fields
+      properties:
+        language:
+          type: string
+          description: Implementation language
+          example: python
+        runtime:
+          type: string
+          description: Required runtime environment
+          example: python3.11
+        entrypoint:
+          type: string
+          description: Entrypoint command or function
+          example: "skill.main:run"
+        inputs:
+          type: object
+          description: JSON Schema for skill inputs
+          additionalProperties: true
+        outputs:
+          type: object
+          description: JSON Schema for skill outputs
+          additionalProperties: true
+        contentDigest:
+          type: string
+          description: SHA-256 digest of the content bundle
+          example: "sha256:abc123..."
+
+    McpServerSpec:
+      type: object
+      description: MCP server-specific specification fields
+      properties:
+        transport:
+          type: array
+          description: Supported transport configurations
+          items:
+            $ref: '#/components/schemas/Transport'
+        tools:
+          type: array
+          description: Tools exposed by this server
+          items:
+            $ref: '#/components/schemas/ToolDef'
+        resources:
+          type: array
+          description: Resources exposed by this server
+          items:
+            $ref: '#/components/schemas/ResourceDef'
+        prompts:
+          type: array
+          description: Prompt templates exposed by this server
+          items:
+            $ref: '#/components/schemas/PromptDef'
+        packages:
+          type: array
+          description: Package registry entries
+          items:
+            $ref: '#/components/schemas/PackageInfo'
+
+    # ---- Shared Sub-schemas ----
+    Repository:
+      type: object
+      description: Source code repository metadata
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Repository URL
+          example: "https://github.com/acme/weather-agent"
+        source:
+          type: string
+          description: Repository hosting platform
+          example: github
+
+    Author:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Jane Smith
+        email:
+          type: string
+          format: email
+          example: jane@acme.com
+        url:
+          type: string
+          format: uri
+
+    Transport:
+      type: object
+      description: Transport endpoint configuration
+      properties:
+        type:
+          type: string
+          enum: [stdio, sse, streamable-http]
+          description: Transport type
+          example: streamable-http
+        url:
+          type: string
+          format: uri
+          description: Remote endpoint URL
+          example: "https://weather.acme.com/mcp"
+
+    McpServerRef:
+      type: object
+      description: Reference to an MCP server dependency
+      properties:
+        name:
+          type: string
+          description: Server name (registry reference or local name)
+          example: acme/weather-mcp
+        type:
+          type: string
+          enum: [registry, remote, command]
+          description: How to resolve this server
+          example: registry
+        url:
+          type: string
+          format: uri
+          description: Remote URL (for remote type)
+        command:
+          type: string
+          description: Command to execute (for command type)
+        args:
+          type: array
+          items:
+            type: string
+          description: Command arguments (for command type)
+        env:
+          type: array
+          items:
+            type: string
+          description: Environment variables
+
+    ToolDef:
+      type: object
+      description: MCP tool definition
+      properties:
+        name:
+          type: string
+          example: get_weather
+        description:
+          type: string
+          example: Get current weather for a location
+        inputSchema:
+          type: object
+          additionalProperties: true
+          description: JSON Schema for tool input
+
+    ResourceDef:
+      type: object
+      description: MCP resource definition
+      properties:
+        uri:
+          type: string
+          description: Resource URI pattern
+          example: "weather://{location}/current"
+        name:
+          type: string
+          example: current-weather
+        description:
+          type: string
+        mimeType:
+          type: string
+          example: application/json
+
+    PromptDef:
+      type: object
+      description: MCP prompt template
+      properties:
+        name:
+          type: string
+          example: weather-report
+        description:
+          type: string
+        arguments:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              description:
+                type: string
+              required:
+                type: boolean
+
+    PackageInfo:
+      type: object
+      description: Package registry reference
+      properties:
+        registryType:
+          type: string
+          description: Package registry type
+          enum: [npm, pypi, docker, crate]
+          example: npm
+        identifier:
+          type: string
+          description: Package identifier in the registry
+          example: "@acme/weather-mcp"
+        version:
+          type: string
+          example: "3.1.0"
+        transport:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [stdio, sse, streamable-http]
+
+    # ---- BOM (Bill of Materials) ----
+    BOM:
+      type: object
+      description: |
+        Bill of Materials declaring the artifact's dependencies
+        on other registry artifacts.
+      properties:
+        dependencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Dependency'
+
+    Dependency:
+      type: object
+      required: [name, kind]
+      description: A dependency on another registry artifact
+      properties:
+        name:
+          type: string
+          description: Artifact name
+          example: acme/geocoding-skill
+        kind:
+          type: string
+          enum: [agent, skill, server]
+          description: Artifact kind
+          example: skill
+        versionConstraint:
+          type: string
+          description: Semver version constraint
+          example: "^2.0.0"
+        optional:
+          type: boolean
+          default: false
+          description: Whether this dependency is optional
+
+    # ---- Evaluation ----
+    EvalRecord:
+      type: object
+      required: [benchmark, score]
+      description: An evaluation record capturing benchmark results.
+      properties:
+        id:
+          type: string
+          description: Unique evaluation record ID (server-assigned)
+          readOnly: true
+          example: eval-001
+        benchmark:
+          type: string
+          description: Benchmark name or identifier
+          example: mmlu
+        evaluator:
+          type: string
+          description: Identity of the evaluator (tool, person, or service)
+          example: openai-evals
+        score:
+          type: number
+          format: double
+          description: Overall score (0.0 to 1.0)
+          minimum: 0
+          maximum: 1
+          example: 0.87
+        metrics:
+          type: object
+          additionalProperties:
+            type: number
+          description: Named metric values
+          example:
+            accuracy: 0.87
+            latency_p99_ms: 450
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Additional context about the evaluation
+          example:
+            model: gpt-4
+            dataset_version: "2025-01"
+        timestamp:
+          type: string
+          format: date-time
+          description: When the evaluation was performed
+          example: "2025-06-15T10:00:00Z"
+
+    # ---- Provenance ----
+    Attestation:
+      type: object
+      required: [predicateType, predicate]
+      description: |
+        A supply-chain attestation following the in-toto framework.
+        Can represent SLSA provenance, code review evidence, or
+        vulnerability scan results.
+      properties:
+        id:
+          type: string
+          description: Unique attestation ID (server-assigned)
+          readOnly: true
+        predicateType:
+          type: string
+          format: uri
+          description: URI identifying the attestation predicate type
+          example: "https://slsa.dev/provenance/v1"
+        predicate:
+          type: object
+          additionalProperties: true
+          description: |
+            The attestation predicate. Structure depends on predicateType.
+          example:
+            buildType: "https://github.com/actions/runner"
+            builder:
+              id: "https://github.com/actions/runner"
+        signature:
+          $ref: '#/components/schemas/Signature'
+        timestamp:
+          type: string
+          format: date-time
+          description: When the attestation was created
+
+    Signature:
+      type: object
+      description: Cryptographic signature for attestation verification
+      properties:
+        keyid:
+          type: string
+          description: Identifier for the signing key
+          example: "projects/acme/locations/global/keyRings/prod/cryptoKeys/signing"
+        sig:
+          type: string
+          description: Base64-encoded signature
+          example: "MEUCIQDx..."
+
+    # ---- Trust ----
+    TrustSignals:
+      type: object
+      description: Computed trust signals for an artifact version
+      properties:
+        overallScore:
+          type: number
+          format: double
+          description: Weighted composite trust score (0.0 to 1.0)
+          minimum: 0
+          maximum: 1
+          example: 0.82
+        level:
+          type: string
+          enum: [none, low, medium, high, critical]
+          description: Human-readable trust level
+          example: high
+        signals:
+          type: object
+          description: Individual trust signal categories
+          properties:
+            provenance:
+              $ref: '#/components/schemas/TrustSignal'
+            evaluation:
+              $ref: '#/components/schemas/TrustSignal'
+            security:
+              $ref: '#/components/schemas/TrustSignal'
+            community:
+              $ref: '#/components/schemas/TrustSignal'
+        computedAt:
+          type: string
+          format: date-time
+          description: When the trust signals were last computed
+
+    TrustSignal:
+      type: object
+      description: Individual trust signal
+      properties:
+        score:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        details:
+          type: object
+          additionalProperties: true
+
+    # ---- Agent Card (A2A) ----
+    AgentCard:
+      type: object
+      description: |
+        Agent card following the Agent-to-Agent (A2A) protocol.
+        Describes the agent's capabilities and how to interact with it.
+      properties:
+        name:
+          type: string
+          example: weather-agent
+        description:
+          type: string
+          example: An agent that provides weather forecasts
+        url:
+          type: string
+          format: uri
+          description: Base URL for agent interaction
+        provider:
+          type: object
+          properties:
+            organization:
+              type: string
+              example: ACME Corp
+            url:
+              type: string
+              format: uri
+        version:
+          type: string
+          example: "1.2.0"
+        capabilities:
+          type: object
+          properties:
+            streaming:
+              type: boolean
+              default: false
+            pushNotifications:
+              type: boolean
+              default: false
+            stateTransitionHistory:
+              type: boolean
+              default: false
+        authentication:
+          type: object
+          properties:
+            schemes:
+              type: array
+              items:
+                type: string
+              example: [bearer, apiKey]
+        skills:
+          type: array
+          description: Skills this agent exposes
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              description:
+                type: string
+              inputSchema:
+                type: object
+                additionalProperties: true
+              outputSchema:
+                type: object
+                additionalProperties: true
+
+    # ---- Promotion ----
+    PromotionRequest:
+      type: object
+      required: [targetStatus]
+      description: Request to promote an artifact to a new lifecycle status
+      properties:
+        targetStatus:
+          type: string
+          enum: [evaluated, approved, published, deprecated, archived]
+          description: The target status to promote to
+          example: published
+        reason:
+          type: string
+          description: Human-readable reason for the promotion
+          example: "Passed all evaluation benchmarks and security review"
+
+    # ---- Federation ----
+    RegistryDiscoveryDocument:
+      type: object
+      description: |
+        Registry discovery document served at
+        `/.well-known/agent-registry.json`. Used for auto-discovery
+        and federation negotiation.
+      properties:
+        registryName:
+          type: string
+          description: Human-readable name of the registry
+          example: "ACME Agent Registry"
+        registryUrl:
+          type: string
+          format: uri
+          description: Base URL of the registry
+          example: "https://registry.acme.example.com"
+        apiVersion:
+          type: string
+          description: Supported API version
+          example: "1.0.0"
+        apiBase:
+          type: string
+          description: API base path
+          example: "/api/v1"
+        capabilities:
+          type: object
+          properties:
+            federation:
+              type: boolean
+            semanticSearch:
+              type: boolean
+            trustScoring:
+              type: boolean
+            provenance:
+              type: boolean
+        supportedKinds:
+          type: array
+          items:
+            type: string
+            enum: [agents, skills, servers]
+        federationEndpoint:
+          type: string
+          description: Base path for federation endpoints
+
+    PeerRegistration:
+      type: object
+      required: [registryUrl]
+      description: Request to register a new federation peer
+      properties:
+        registryUrl:
+          type: string
+          format: uri
+          description: Base URL of the peer registry
+          example: "https://partner.registry.example.com"
+        name:
+          type: string
+          description: Human-readable name for the peer
+          example: "Partner Registry"
+        apiKey:
+          type: string
+          description: API key for authenticating with the peer
+
+    Peer:
+      type: object
+      description: A registered federation peer
+      properties:
+        peerId:
+          type: string
+          description: Unique peer identifier
+          example: peer-registry-east
+        registryUrl:
+          type: string
+          format: uri
+          example: "https://east.registry.example.com"
+        name:
+          type: string
+          example: "East Coast Registry"
+        status:
+          type: string
+          enum: [active, inactive, error]
+          example: active
+        lastSyncAt:
+          type: string
+          format: date-time
+          example: "2025-06-15T11:00:00Z"
+        artifactCount:
+          type: integer
+          description: Number of artifacts synced from this peer
+          example: 150
+        registeredAt:
+          type: string
+          format: date-time
+
+    SyncRequest:
+      type: object
+      required: [peerId]
+      description: Request to trigger federation sync with a peer
+      properties:
+        peerId:
+          type: string
+          description: Peer registry identifier to sync with
+          example: "peer-registry-east"
+        cursor:
+          type: string
+          description: Resume sync from this cursor position
+          example: "2025-06-15T10:00:00Z"
+
+    SyncResult:
+      type: object
+      description: Result of a federation sync operation
+      properties:
+        peerId:
+          type: string
+          example: "peer-registry-east"
+        artifactsSynced:
+          type: integer
+          example: 12
+        artifactsUpdated:
+          type: integer
+          example: 3
+        artifactsRemoved:
+          type: integer
+          example: 1
+        newCursor:
+          type: string
+          example: "2025-06-15T12:20:00Z"
+        syncDurationMs:
+          type: integer
+          example: 2340
+
+    # ---- Dependency Graph ----
+    DependencyNode:
+      type: object
+      description: A node in the resolved dependency tree
+      properties:
+        name:
+          type: string
+          example: geocoding-skill
+        kind:
+          type: string
+          enum: [agent, skill, server]
+          example: skill
+        version:
+          type: string
+          example: "2.0.1"
+        versionConstraint:
+          type: string
+          description: The constraint that was resolved
+          example: "^2.0.0"
+        resolved:
+          type: boolean
+          description: Whether the dependency was successfully resolved
+          example: true
+        error:
+          type: string
+          description: Error message if resolution failed
+        dependencies:
+          type: array
+          description: Transitive dependencies of this node
+          items:
+            $ref: '#/components/schemas/DependencyNode'
+
+    DependencyGraph:
+      type: object
+      description: Root of a resolved dependency tree
+      properties:
+        artifact:
+          type: object
+          properties:
+            name:
+              type: string
+            kind:
+              type: string
+            version:
+              type: string
+        dependencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/DependencyNode'
+
+    # ---- Composed Response Schemas ----
+    ArtifactResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/RegistryArtifact'
+        _meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    ArtifactListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegistryArtifact'
+        _meta:
+          $ref: '#/components/schemas/ResponseMeta'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    EvalRecordResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/EvalRecord'
+        _meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    EvalRecordListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvalRecord'
+        _meta:
+          $ref: '#/components/schemas/ResponseMeta'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    AttestationResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Attestation'
+        _meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    AttestationListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attestation'
+        _meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    TrustSignalsResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/TrustSignals'
+        _meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    DiscoverResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/RegistryArtifact'
+              - type: object
+                properties:
+                  relevanceScore:
+                    type: number
+                    format: double
+                    description: Semantic search relevance score
+                    example: 0.94
+                  trustScore:
+                    type: number
+                    format: double
+                    description: Overall trust score
+                    example: 0.82
+        _meta:
+          $ref: '#/components/schemas/ResponseMeta'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    DependencyGraphResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/DependencyGraph'
+        _meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    PeerResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Peer'
+        _meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    PeerListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Peer'
+        _meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    SyncResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/SyncResult'
+        _meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+  # ---------------------------------------------------------------------------
+  # Responses
+  # ---------------------------------------------------------------------------
+  responses:
+    BadRequest:
+      description: Bad Request -- The request was malformed or contains invalid parameters.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: 400
+              message: "Invalid request parameters"
+              details:
+                - field: metadata.version
+                  message: "Version must follow semantic versioning (e.g., 1.2.3)"
+            _meta:
+              requestId: req-err-001
+              timestamp: "2025-06-15T12:00:00Z"
+              version: "1.0.0"
+
+    Unauthorized:
+      description: Unauthorized -- Missing or invalid authentication credentials.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: 401
+              message: "Authentication required"
+            _meta:
+              requestId: req-err-002
+              timestamp: "2025-06-15T12:00:00Z"
+              version: "1.0.0"
+
+    Forbidden:
+      description: Forbidden -- The authenticated user lacks permission for this operation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: 403
+              message: "Insufficient permissions to perform this operation"
+            _meta:
+              requestId: req-err-003
+              timestamp: "2025-06-15T12:00:00Z"
+              version: "1.0.0"
+
+    NotFound:
+      description: Not Found -- The requested artifact or resource does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: 404
+              message: "Artifact not found"
+            _meta:
+              requestId: req-err-004
+              timestamp: "2025-06-15T12:00:00Z"
+              version: "1.0.0"
+
+    Conflict:
+      description: Conflict -- A resource with the same identity already exists.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: 409
+              message: "Version 1.2.0 already exists for artifact acme/weather-agent"
+            _meta:
+              requestId: req-err-005
+              timestamp: "2025-06-15T12:00:00Z"
+              version: "1.0.0"
+
+    UnprocessableEntity:
+      description: Unprocessable Entity -- The request was well-formed but contains semantic validation errors.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: 422
+              message: "Validation failed"
+              details:
+                - field: spec.agent.modelProvider
+                  message: "Unknown model provider 'invalid-provider'"
+                - field: bom.dependencies[0].versionConstraint
+                  message: "Invalid semver constraint: '>>1.0'"
+            _meta:
+              requestId: req-err-006
+              timestamp: "2025-06-15T12:00:00Z"
+              version: "1.0.0"

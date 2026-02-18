@@ -1,0 +1,240 @@
+# Agent Registry Spec — Full MCP Server
+#
+# Demonstrates a fully-specified MCP server manifest for "prometheus-mcp".
+# Includes all optional sections: transport, tools, resources, BOM
+# (runtimeDependencies, externalServices), provenance, and trust signals.
+#
+# All fields conform to the JSON schemas in ../schemas/.
+
+kind: mcp-server
+apiVersion: v1alpha1
+
+identity:
+  name: prometheus-mcp
+  version: 2.0.0
+  title: Prometheus MCP Server
+  description: >-
+    MCP server for querying Prometheus metrics, alerts, and targets.
+    Supports instant queries, range queries, label discovery, alert
+    enumeration, and target health inspection.
+
+metadata:
+  labels:
+    team: observability
+    tier: production
+  tags:
+    - prometheus
+    - metrics
+    - monitoring
+    - observability
+  category: observability/metrics
+  authors:
+    - name: Observability Team
+      email: observability@example.com
+  license: Apache-2.0
+  repository: https://github.com/example-org/prometheus-mcp
+
+transport:
+  type: streamable-http
+  port: 8080
+  url: https://prometheus-mcp.example.com/mcp
+
+tools:
+  - name: query-instant
+    description: Execute an instant PromQL query and return the current value
+    inputSchema:
+      type: object
+      properties:
+        query:
+          type: string
+          description: "PromQL expression (e.g., up{job=\"apiserver\"})"
+        time:
+          type: string
+          description: "Evaluation timestamp (RFC3339 or Unix). Defaults to now."
+      required:
+        - query
+
+  - name: query-range
+    description: Execute a range PromQL query over a time window
+    inputSchema:
+      type: object
+      properties:
+        query:
+          type: string
+          description: PromQL expression
+        start:
+          type: string
+          description: Start timestamp (RFC3339 or Unix)
+        end:
+          type: string
+          description: End timestamp (RFC3339 or Unix)
+        step:
+          type: string
+          description: "Query resolution step (e.g., 15s, 1m, 5m)"
+      required:
+        - query
+        - start
+        - end
+
+  - name: list-labels
+    description: Return all known label names or values for a given label
+    inputSchema:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Label name to list values for (omit for all label names)
+        match:
+          type: array
+          description: Series selector filters
+      required: []
+
+  - name: get-alerts
+    description: Return all currently firing and pending alerts
+    inputSchema:
+      type: object
+      properties:
+        state:
+          type: string
+          description: "Filter by alert state (firing, pending, inactive)"
+      required: []
+
+  - name: get-targets
+    description: Return current scrape target status and health
+    inputSchema:
+      type: object
+      properties:
+        state:
+          type: string
+          description: "Filter by target state (active, dropped, any)"
+      required: []
+
+  - name: get-metric-metadata
+    description: Return metadata about a metric (type, help, unit)
+    inputSchema:
+      type: object
+      properties:
+        metric:
+          type: string
+          description: Metric name
+      required:
+        - metric
+
+resources:
+  - uri: prometheus://config
+    name: Prometheus Configuration
+    description: Current Prometheus server configuration (scrape configs, rules, etc.)
+    mimeType: application/yaml
+  - uri: prometheus://rules
+    name: Alerting and Recording Rules
+    description: All loaded alerting and recording rules with evaluation status
+    mimeType: application/json
+
+artifacts:
+  - registry: ghcr.io
+    repository: example-org/prometheus-mcp
+    tag: "2.0.0"
+    digest: sha256:d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592
+
+bom:
+  runtimeDependencies:
+    - name: go
+      version: ">=1.22.0"
+      type: runtime
+    - name: prometheus/client_golang
+      version: "1.19.0"
+      type: package
+      source: go-modules
+    - name: mark3labs/mcp-go
+      version: "0.25.0"
+      type: package
+      source: go-modules
+    - name: prometheus/common
+      version: "0.52.0"
+      type: package
+      source: go-modules
+  externalServices:
+    - name: Prometheus API
+      type: api
+      required: true
+      description: "Prometheus HTTP API v1 endpoint at ${PROMETHEUS_URL}/api/v1"
+
+provenance:
+  slsa:
+    level: 3
+    buildType: https://slsa.dev/container/v1
+    builder:
+      id: https://github.com/example-org/prometheus-mcp/.github/workflows/release.yaml
+  signatures:
+    - keyId: fulcio:observability@example.com
+      signature: MEYCIQCx...base64...==
+      rekorLogId: a8f3bc92e1d74f6a8b2c1d3e5f7a9b0c2d4e
+  sbom:
+    format: CycloneDX
+    uri: https://github.com/example-org/prometheus-mcp/releases/download/v2.0.0/sbom.cdx.json
+    digest: sha256:ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d
+
+trustSignals:
+  compositeScore: 0.86
+  calculatedAt: "2026-02-01T08:00:00Z"
+  components:
+    provenance:
+      score: 0.92
+      weight: 0.25
+      lastUpdated: "2026-02-01T08:00:00Z"
+      details:
+        slsaLevel: 3
+        signatureVerified: true
+        sbomAvailable: true
+        reproducibleBuild: true
+    evaluation:
+      score: 0.91
+      weight: 0.25
+      lastUpdated: "2026-01-10T08:00:00Z"
+      details:
+        benchmarkCount: 2
+        passingRate: 0.93
+        lastEvaluated: "2026-01-10T08:00:00Z"
+        evaluationFreshness: current
+    codeHealth:
+      score: 0.85
+      weight: 0.20
+      lastUpdated: "2026-02-01T08:00:00Z"
+      details:
+        testCoverage: 0.85
+        lintingPassed: true
+        vulnerabilities:
+          critical: 0
+          high: 0
+          medium: 1
+          low: 2
+        dependencyFreshness: 0.95
+    publisherReputation:
+      score: 0.88
+      weight: 0.15
+      lastUpdated: "2026-02-01T08:00:00Z"
+      details:
+        verified: true
+        publishedArtifactCount: 18
+        accountAge: 3y0m
+        incidentHistory: 0
+    community:
+      score: 0.70
+      weight: 0.10
+      lastUpdated: "2026-02-01T08:00:00Z"
+      details:
+        downloads: 8900
+        stars: 210
+        activeUsers: 67
+        issueResponseTime: 6h
+    operational:
+      score: 0.85
+      weight: 0.05
+      lastUpdated: "2026-02-01T08:00:00Z"
+      details:
+        uptime: 0.999
+        errorRate: 0.001
+        medianLatency: 80ms
+        p99Latency: 350ms
+
+status: published

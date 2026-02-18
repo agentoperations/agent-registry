@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentregistry.dev/schemas/eval-record.schema.json",
+  "title": "Evaluation Record",
+  "description": "Schema for evaluation records that capture benchmark results, metrics, and attestation for registry artifacts. Evaluation records provide the evidence base for trust scoring.",
+  "type": "object",
+  "required": ["benchmark", "evaluator", "results", "context"],
+  "properties": {
+    "benchmark": {
+      "$ref": "#/$defs/Benchmark",
+      "description": "The benchmark or evaluation suite used."
+    },
+    "evaluator": {
+      "$ref": "#/$defs/Evaluator",
+      "description": "Who or what performed the evaluation."
+    },
+    "results": {
+      "$ref": "#/$defs/Results",
+      "description": "Evaluation results including overall score and per-metric breakdowns."
+    },
+    "context": {
+      "$ref": "#/$defs/EvalContext",
+      "description": "Environmental and temporal context of the evaluation run."
+    },
+    "attestation": {
+      "$ref": "#/$defs/Attestation",
+      "description": "Optional cryptographic attestation of the evaluation results."
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "Benchmark": {
+      "type": "object",
+      "description": "Identification of the benchmark or evaluation suite.",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Benchmark name (e.g., 'SWE-bench', 'HumanEval', 'MMLU', 'custom-qa-suite')."
+        },
+        "version": {
+          "type": "string",
+          "description": "Benchmark version or revision."
+        },
+        "suite": {
+          "type": "string",
+          "description": "Test suite within the benchmark (e.g., 'lite', 'full', 'verified')."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Evaluator": {
+      "type": "object",
+      "description": "Entity that performed the evaluation.",
+      "required": ["identity", "method"],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "description": "Name or identifier of the evaluator (e.g., 'ci-pipeline', 'human-review-team', 'eval-service-v2')."
+        },
+        "method": {
+          "type": "string",
+          "enum": ["automated", "human", "hybrid"],
+          "description": "Evaluation method. 'automated' for CI/CD pipelines and scripts, 'human' for manual review, 'hybrid' for a combination."
+        },
+        "version": {
+          "type": "string",
+          "description": "Version of the evaluation tooling or harness."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Results": {
+      "type": "object",
+      "description": "Evaluation results.",
+      "required": ["overallScore"],
+      "properties": {
+        "overallScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Normalized overall score between 0 (worst) and 1 (best)."
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Metric"
+          },
+          "description": "Individual metric measurements."
+        },
+        "taskBreakdown": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TaskResult"
+          },
+          "description": "Per-task or per-category result breakdown."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Metric": {
+      "type": "object",
+      "description": "A single metric measurement.",
+      "required": ["name", "value"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Metric name (e.g., 'accuracy', 'latency-p99', 'tool-call-success-rate')."
+        },
+        "value": {
+          "type": "number",
+          "description": "Measured value."
+        },
+        "threshold": {
+          "type": "number",
+          "description": "Pass/fail threshold for this metric."
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unit of measurement (e.g., 'percent', 'ms', 'tokens/sec')."
+        }
+      },
+      "additionalProperties": false
+    },
+    "TaskResult": {
+      "type": "object",
+      "description": "Result for a specific task or category within the evaluation.",
+      "required": ["name", "score"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Task or category name."
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Normalized score for this task."
+        },
+        "passed": {
+          "type": "boolean",
+          "description": "Whether the task met its passing criteria."
+        },
+        "details": {
+          "type": "string",
+          "description": "Additional details or notes about the task result."
+        }
+      },
+      "additionalProperties": false
+    },
+    "EvalContext": {
+      "type": "object",
+      "description": "Environmental context for the evaluation run.",
+      "required": ["timestamp"],
+      "properties": {
+        "environment": {
+          "type": "string",
+          "description": "Execution environment (e.g., 'ci-production', 'local-dev', 'staging')."
+        },
+        "modelVersion": {
+          "type": "string",
+          "description": "Specific model version or checkpoint used during evaluation."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when the evaluation was performed."
+        },
+        "duration": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?(s|m|h)$",
+          "description": "Total duration of the evaluation run (e.g., '45m', '2.5h')."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Attestation": {
+      "type": "object",
+      "description": "Cryptographic attestation of evaluation results for tamper-evidence.",
+      "required": ["signature", "signedBy", "algorithm"],
+      "properties": {
+        "signature": {
+          "type": "string",
+          "description": "Base64-encoded cryptographic signature over the evaluation results."
+        },
+        "signedBy": {
+          "type": "string",
+          "description": "Identity of the signer (e.g., key ID, email, or URI)."
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": ["ecdsa-sha256", "ed25519", "rsa-sha256"],
+          "description": "Signature algorithm used."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
