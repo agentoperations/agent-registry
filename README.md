@@ -38,6 +38,14 @@ bash docs/demo-teardown.sh                       # cleanup
 
 Narration requires `OPENAI_API_KEY` to be set and `ffmpeg` for MP4 output.
 
+### Presentation
+
+A reveal.js slide deck covering the problem, architecture, and workflow:
+
+[View presentation](https://htmlpreview.github.io/?https://github.com/zanetworker/agent-registry-spec/blob/main/docs/presentation.html) | [Source](docs/presentation.html)
+
+Open locally: `open docs/presentation.html`
+
 ## How It Works
 
 ```
