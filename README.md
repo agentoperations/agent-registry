@@ -46,6 +46,14 @@ A reveal.js slide deck covering the problem, architecture, and workflow:
 
 Open locally: `open docs/presentation.html`
 
+### Web UI
+
+The server embeds a catalog UI at the root URL. Browse artifacts by kind, filter by status, search across all kinds, and click through to see identity, OCI references, eval records, promotion history, and resolved dependencies.
+
+![Catalog view](docs/screenshots/ui-catalog.png)
+
+![Detail panel — eval records, promotion history, dependencies](docs/screenshots/ui-detail.png)
+
 ## How It Works
 
 ```
