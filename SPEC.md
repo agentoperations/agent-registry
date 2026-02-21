@@ -2351,7 +2351,7 @@ The Evaluation Results Interface provides a standardized way to submit, store, q
 
 ### 8.2 EvalRecord Schema
 
-An `EvalRecord` represents a single evaluation run against a specific artifact version.
+An `EvalRecord` represents a single evaluation run against a specific artifact version. The schema is intentionally provider-agnostic: any evaluation framework (eval-hub, lm-evaluation-harness, Garak, RAGAS, or custom pipelines) can submit results as long as they conform to this envelope.
 
 ```json
 {
@@ -2359,11 +2359,17 @@ An `EvalRecord` represents a single evaluation run against a specific artifact v
   "artifactName": "acme/my-agent",
   "artifactVersion": "2.1.0",
   "artifactKind": "agent",
+  "category": "safety",
+  "provider": {
+    "name": "garak",
+    "version": "0.9.0",
+    "url": "https://github.com/NVIDIA/garak"
+  },
   "benchmark": {
-    "name": "customer-satisfaction",
+    "name": "toxicity",
     "version": "1.0.0",
-    "suite": "acme-agent-benchmarks",
-    "description": "Measures customer satisfaction scores from simulated conversations"
+    "suite": "garak-safety",
+    "description": "Measures toxic content generation rates under adversarial probing"
   },
   "evaluator": {
     "name": "acme-eval-pipeline",
@@ -2432,6 +2438,8 @@ An `EvalRecord` represents a single evaluation run against a specific artifact v
 | `artifactName` | string | Yes | Fully qualified artifact name. |
 | `artifactVersion` | string | Yes | Artifact version evaluated. |
 | `artifactKind` | string | Yes | Artifact kind. |
+| `category` | string | No | Evaluation category. See [Section 8.3.2](#832-evaluation-category). Default: `functional`. |
+| `provider` | Provider | No | Evaluation provider/framework. See [Section 8.3.3](#833-provider). |
 | `benchmark` | Benchmark | Yes | Benchmark identification. |
 | `evaluator` | Evaluator | Yes | Who/what performed the evaluation. |
 | `results` | Results | Yes | Evaluation results. |
@@ -2439,16 +2447,55 @@ An `EvalRecord` represents a single evaluation run against a specific artifact v
 | `attestation` | Attestation | No | Cryptographic attestation of results. |
 | `createdAt` | string | Generated | RFC3339 timestamp when the record was created. |
 
-#### 8.3.2 Benchmark
+#### 8.3.2 Evaluation Category
+
+The `category` field classifies the type of evaluation. This drives how results are aggregated and how they contribute to trust signals (see [Section 10](#10-trust-signals)).
+
+| Value | Description |
+|---|---|
+| `functional` | Standard capability and accuracy benchmarks (e.g., HumanEval, SWE-bench, MMLU). |
+| `safety` | Safety and alignment evaluations including toxicity, bias, and harmful content detection. |
+| `red-team` | Adversarial testing — prompt injection, jailbreaking, PII leakage, and other attack surface probing. |
+| `performance` | Latency, throughput, resource utilization, and cost efficiency. |
+| `custom` | Provider-defined or organization-specific evaluation types. |
+
+The registry does not prescribe which evaluation frameworks map to which categories. A Garak run might produce `safety` or `red-team` records depending on the benchmark. An eval-hub job might produce records across multiple categories in a single run.
+
+#### 8.3.3 Provider
+
+The `provider` block identifies the evaluation framework that produced the results. This is optional — the registry accepts results from any source — but when present, it enables provider-aware aggregation and filtering.
+
+```yaml
+provider:
+  name: "eval-hub"
+  version: "1.2.0"
+  url: "https://github.com/eval-hub/eval-hub"
+```
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `name` | string | Yes | Benchmark identifier (e.g., `accuracy`, `latency`, `customer-satisfaction`). |
+| `provider.name` | string | Yes | Provider identifier (e.g., `eval-hub`, `garak`, `lm-evaluation-harness`, `ragas`, `custom`). |
+| `provider.version` | string | No | Provider version. |
+| `provider.url` | string | No | URL for the provider project or documentation. |
+
+The registry treats providers as opaque — it does not validate provider names against a fixed list. Any string is accepted. Well-known providers include:
+
+* `eval-hub` — Unified evaluation orchestrator supporting multiple frameworks
+* `garak` — LLM vulnerability scanner and red-teaming framework
+* `lm-evaluation-harness` — EleutherAI's evaluation harness for language models
+* `ragas` — RAG evaluation framework
+* `guidellm` — Structured output evaluation
+
+#### 8.3.4 Benchmark
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | Yes | Benchmark identifier (e.g., `accuracy`, `latency`, `customer-satisfaction`, `toxicity`, `prompt-injection`). |
 | `version` | string | No | Benchmark version. |
 | `suite` | string | No | Benchmark suite name (groups related benchmarks). |
 | `description` | string | No | What this benchmark measures. |
 
-#### 8.3.3 Evaluator
+#### 8.3.5 Evaluator
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -2457,7 +2504,7 @@ An `EvalRecord` represents a single evaluation run against a specific artifact v
 | `type` | string | Yes | Evaluator type: `automated`, `human`, `hybrid`, `llm-as-judge`. |
 | `identity` | string | No | Verifiable identity (URL, email). |
 
-#### 8.3.4 Results
+#### 8.3.6 Results
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -2465,7 +2512,7 @@ An `EvalRecord` represents a single evaluation run against a specific artifact v
 | `metrics` | map[string]Metric | No | Named metrics with values and metadata. |
 | `perTask` | TaskResult[] | No | Per-task breakdown of results. |
 
-#### 8.3.5 Metric
+#### 8.3.7 Metric
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -2473,7 +2520,7 @@ An `EvalRecord` represents a single evaluation run against a specific artifact v
 | `unit` | string | No | Unit of measurement (e.g., `ratio`, `seconds`, `tokens`, `percent`). |
 | `higher_is_better` | boolean | No | Whether higher values indicate better performance. Default: `true`. |
 
-#### 8.3.6 TaskResult
+#### 8.3.8 TaskResult
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -2482,7 +2529,7 @@ An `EvalRecord` represents a single evaluation run against a specific artifact v
 | `metrics` | map[string]Metric | No | Task-specific metrics. |
 | `detail` | string | No | Human-readable detail or explanation. |
 
-#### 8.3.7 Context
+#### 8.3.9 Context
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -2495,7 +2542,7 @@ An `EvalRecord` represents a single evaluation run against a specific artifact v
 | `completedAt` | string | No | RFC3339 timestamp of evaluation completion. |
 | `parameters` | map[string]any | No | Evaluation parameters (temperature, sampling, etc.). |
 
-#### 8.3.8 Attestation
+#### 8.3.10 Attestation
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -2553,6 +2600,9 @@ evalBaseline:
   requiredBenchmarks:
     - "accuracy"
     - "safety"
+  requiredCategories:
+    - "functional"
+    - "safety"
   requiredEvaluatorTypes:
     - "automated"
   minimumDatasetSize: 100
@@ -2565,6 +2615,7 @@ evalBaseline:
 |---|---|---|---|
 | `minimumScore` | float | No | Minimum overall score required (0.0-1.0). Default: `0.0`. |
 | `requiredBenchmarks` | string[] | No | Benchmark names that must have results. |
+| `requiredCategories` | string[] | No | Evaluation categories that must be covered (e.g., `["functional", "safety"]`). When set, promotion to `evaluated` requires at least one eval record in each listed category. |
 | `requiredEvaluatorTypes` | string[] | No | Required evaluator types. |
 | `minimumDatasetSize` | integer | No | Minimum number of evaluation samples. |
 | `maximumLatency` | object | No | Maximum acceptable latency thresholds. |
@@ -2951,19 +3002,25 @@ Measures the completeness and strength of supply chain provenance.
 
 #### 10.3.2 Evaluation Score (Weight: 0.25)
 
-Measures the breadth and quality of evaluation results.
+Measures the breadth and quality of evaluation results, including safety and adversarial testing. The registry considers eval records across all categories (`functional`, `safety`, `red-team`, `performance`, `custom`) when computing this score.
 
 | Factor | Points | Max |
 |---|---|---|
 | No evaluation records | 0.0 | |
-| At least one eval record | 0.3 | |
-| Meets evalBaseline minimumScore | +0.2 | |
-| All requiredBenchmarks covered | +0.2 | |
-| Multiple evaluator types | +0.1 | |
-| Trend is `improving` or `stable` | +0.1 | |
+| At least one eval record (any category) | 0.2 | |
+| Meets evalBaseline minimumScore | +0.15 | |
+| All requiredBenchmarks covered | +0.15 | |
+| Safety evaluation present (category: `safety`) | +0.15 | |
+| Red-team evaluation present (category: `red-team`) | +0.15 | |
+| Multiple evaluator types | +0.05 | |
+| Trend is `improving` or `stable` | +0.05 | |
 | Attestation on eval records | +0.1 | 1.0 |
 
 **Score calculation**: Sum of applicable factors, capped at 1.0.
+
+Safety and red-team evaluations are distinct: a `safety` eval measures alignment and harm prevention under normal use (e.g., toxicity detection, bias measurement), while a `red-team` eval measures resilience under adversarial attack (e.g., prompt injection, jailbreaking, PII extraction). Both are valued because an artifact can pass safety benchmarks while still being vulnerable to adversarial probing.
+
+Results from any provider are accepted. For example, a Garak red-teaming run submitted with `category: "red-team"` and `provider.name: "garak"` contributes the same trust signal points as a custom red-team pipeline — the registry scores based on category coverage, not provider identity.
 
 #### 10.3.3 Code Health Score (Weight: 0.20)
 
@@ -3049,14 +3106,17 @@ For artifacts without remote transport (stdio MCP servers, skills), the operatio
       ]
     },
     "evaluation": {
-      "score": 0.80,
+      "score": 0.90,
       "weight": 0.25,
-      "weightedContribution": 0.20,
+      "weightedContribution": 0.225,
       "factors": [
-        { "name": "eval-records", "value": "5 records", "points": 0.3 },
-        { "name": "baseline-met", "value": "true", "points": 0.2 },
-        { "name": "benchmarks-covered", "value": "3/3", "points": 0.2 },
-        { "name": "evaluator-diversity", "value": "automated+human", "points": 0.1 }
+        { "name": "eval-records", "value": "8 records", "points": 0.2 },
+        { "name": "baseline-met", "value": "true", "points": 0.15 },
+        { "name": "benchmarks-covered", "value": "3/3", "points": 0.15 },
+        { "name": "safety-eval-present", "value": "garak toxicity + bias", "points": 0.15 },
+        { "name": "red-team-eval-present", "value": "garak prompt-injection + pii-leakage", "points": 0.15 },
+        { "name": "evaluator-diversity", "value": "automated+human", "points": 0.05 },
+        { "name": "trend", "value": "stable", "points": 0.05 }
       ]
     },
     "codeHealth": {

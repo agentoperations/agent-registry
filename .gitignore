@@ -1,0 +1,26 @@
+# Binaries (root level only)
+/arctl
+/agentctl
+*.exe
+
+# Database
+*.db
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*~
+
+# Claude Code
+.claude/settings.local.json
+
+# Playwright
+.playwright-mcp/
+
+# Generated recordings (re-record with showtime)
+*.mp4
+*.gif
+
+# OS
+.DS_Store

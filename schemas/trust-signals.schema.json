@@ -155,7 +155,7 @@
     },
     "EvaluationDetails": {
       "type": "object",
-      "description": "Detail fields for the evaluation trust component.",
+      "description": "Detail fields for the evaluation trust component, including safety and adversarial testing coverage.",
       "properties": {
         "benchmarkCount": {
           "type": "integer",
@@ -167,6 +167,29 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Fraction of evaluations that passed."
+        },
+        "categoryCoverage": {
+          "type": "object",
+          "description": "Which evaluation categories have been covered.",
+          "properties": {
+            "functional": { "type": "boolean", "description": "Whether functional evaluations exist." },
+            "safety": { "type": "boolean", "description": "Whether safety evaluations exist (toxicity, bias, harm prevention)." },
+            "redTeam": { "type": "boolean", "description": "Whether adversarial red-team evaluations exist (prompt injection, jailbreaking, PII extraction)." },
+            "performance": { "type": "boolean", "description": "Whether performance evaluations exist." }
+          },
+          "additionalProperties": false
+        },
+        "safetyScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Aggregate score across safety-category eval records. Null if no safety evals exist."
+        },
+        "redTeamScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Aggregate score across red-team-category eval records. Null if no red-team evals exist."
         },
         "lastEvaluated": {
           "type": "string",

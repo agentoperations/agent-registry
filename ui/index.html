@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Registry</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #0f172a; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .card { transition: all 0.15s; cursor: pointer; }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 9999px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .badge-draft { background: #334155; color: #94a3b8; }
+  .badge-evaluated { background: #1e3a5f; color: #93c5fd; }
+  .badge-approved { background: #581c87; color: #d8b4fe; }
+  .badge-published { background: #14532d; color: #86efac; }
+  .badge-deprecated { background: #7c2d12; color: #fed7aa; }
+  .badge-archived { background: #1c1917; color: #78716c; }
+  .kind-agent { border-left: 3px solid #3b82f6; }
+  .kind-skill { border-left: 3px solid #a855f7; }
+  .kind-mcp-server { border-left: 3px solid #10b981; }
+  .tab { padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; }
+  .tab.active { background: #1e293b; color: #f8fafc; }
+  .tab:not(.active) { color: #64748b; }
+  .tab:not(.active):hover { color: #94a3b8; }
+  .detail-section { background: #1e293b; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+  .timeline-dot { width: 10px; height: 10px; border-radius: 50%; background: #3b82f6; margin-top: 5px; }
+  .timeline-line { width: 2px; background: #334155; min-height: 20px; margin-left: 4px; }
+  #detail-panel { transition: all 0.2s; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- Header -->
+<header class="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-sm">AR</div>
+    <h1 class="text-lg font-semibold text-slate-100">Agent Registry</h1>
+  </div>
+  <input id="search" type="text" placeholder="Search artifacts..."
+    class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm w-72 focus:outline-none focus:border-blue-500 text-slate-200 placeholder-slate-500">
+</header>
+
+<!-- Filters -->
+<div class="px-6 py-3 flex items-center gap-2 border-b border-slate-800">
+  <div class="flex gap-1" id="kind-tabs">
+    <div class="tab active" data-kind="all">All</div>
+    <div class="tab" data-kind="agents">Agents</div>
+    <div class="tab" data-kind="skills">Skills</div>
+    <div class="tab" data-kind="mcp-servers">MCP Servers</div>
+  </div>
+  <div class="ml-auto">
+    <select id="status-filter" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300">
+      <option value="">All statuses</option>
+      <option value="draft">Draft</option>
+      <option value="evaluated">Evaluated</option>
+      <option value="approved">Approved</option>
+      <option value="published">Published</option>
+      <option value="deprecated">Deprecated</option>
+    </select>
+  </div>
+</div>
+
+<!-- Main content -->
+<div class="flex">
+  <!-- Catalog grid -->
+  <div id="catalog" class="flex-1 p-6">
+    <div id="artifact-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    <div id="empty-state" class="hidden text-center py-20 text-slate-500">
+      <p class="text-lg">No artifacts found</p>
+      <p class="text-sm mt-1">Push artifacts with: agentctl push agents manifest.yaml</p>
+    </div>
+    <div id="loading" class="text-center py-20 text-slate-500">Loading...</div>
+  </div>
+
+  <!-- Detail panel (shown on click) -->
+  <div id="detail-panel" class="hidden w-[480px] border-l border-slate-800 p-6 overflow-y-auto max-h-[calc(100vh-120px)] sticky top-0">
+    <div class="flex items-center justify-between mb-4">
+      <h2 id="detail-title" class="text-lg font-semibold"></h2>
+      <button onclick="closeDetail()" class="text-slate-500 hover:text-slate-300 text-xl">&times;</button>
+    </div>
+    <div id="detail-content"></div>
+  </div>
+</div>
+
+<script>
+const API = '/api/v1';
+let allArtifacts = [];
+let activeKind = 'all';
+let activeStatus = '';
+
+// --- Fetch ---
+
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  const json = await res.json();
+  return json.data || [];
+}
+
+async function loadAll() {
+  document.getElementById('loading').classList.remove('hidden');
+  try {
+    const [agents, skills, servers] = await Promise.all([
+      fetchJSON(`${API}/agents?limit=100`),
+      fetchJSON(`${API}/skills?limit=100`),
+      fetchJSON(`${API}/mcp-servers?limit=100`),
+    ]);
+    allArtifacts = [...agents, ...skills, ...servers];
+    render();
+  } catch (e) {
+    document.getElementById('loading').textContent = 'Failed to load: ' + e.message;
+  }
+}
+
+// --- Render catalog ---
+
+function render() {
+  document.getElementById('loading').classList.add('hidden');
+  const query = document.getElementById('search').value.toLowerCase();
+  const grid = document.getElementById('artifact-grid');
+  const empty = document.getElementById('empty-state');
+
+  let filtered = allArtifacts;
+  if (activeKind !== 'all') {
+    const kindMap = { agents: 'agent', skills: 'skill', 'mcp-servers': 'mcp-server' };
+    filtered = filtered.filter(a => a.kind === kindMap[activeKind]);
+  }
+  if (activeStatus) {
+    filtered = filtered.filter(a => a.status === activeStatus);
+  }
+  if (query) {
+    filtered = filtered.filter(a =>
+      a.identity.name.toLowerCase().includes(query) ||
+      a.identity.title.toLowerCase().includes(query) ||
+      a.identity.description.toLowerCase().includes(query) ||
+      (a.metadata?.tags || []).some(t => t.toLowerCase().includes(query))
+    );
+  }
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  grid.innerHTML = filtered.map(a => {
+    const cat = a.metadata?.category || '';
+    const tags = (a.metadata?.tags || []).slice(0, 3).map(t =>
+      `<span class="text-xs bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded">${t}</span>`
+    ).join(' ');
+    return `
+      <div class="card kind-${a.kind} bg-slate-800/50 border border-slate-700/50 rounded-lg p-4"
+           onclick="showDetail('${a.kind}', '${a.identity.name}', '${a.identity.version}')">
+        <div class="flex items-start justify-between mb-2">
+          <div class="text-xs text-slate-500 font-medium">${a.kind}</div>
+          <span class="badge badge-${a.status}">${a.status}</span>
+        </div>
+        <div class="font-medium text-slate-200 mb-1">${a.identity.name}</div>
+        <div class="text-sm text-slate-400 mb-2">${a.identity.title}</div>
+        <div class="text-xs text-slate-500 mb-3 line-clamp-2">${a.identity.description}</div>
+        <div class="flex items-center justify-between">
+          <div class="text-xs text-slate-500">v${a.identity.version}</div>
+          <div class="flex gap-1">${tags}</div>
+        </div>
+        ${cat ? `<div class="text-xs text-slate-600 mt-2">${cat}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+// --- Detail panel ---
+
+async function showDetail(kind, name, version) {
+  const panel = document.getElementById('detail-panel');
+  const content = document.getElementById('detail-content');
+  const title = document.getElementById('detail-title');
+  panel.classList.remove('hidden');
+
+  const parts = name.split('/');
+  const ns = parts[0], artifact = parts[1];
+  const kindPlural = kind === 'mcp-server' ? 'mcp-servers' : kind + 's';
+  const base = `${API}/${kindPlural}/${ns}/${artifact}/versions/${version}`;
+
+  title.textContent = `${name}@${version}`;
+  content.innerHTML = '<div class="text-slate-500">Loading...</div>';
+
+  try {
+    const [artRes, inspectRes, depsRes] = await Promise.all([
+      fetchJSON(base),
+      fetchJSON(`${base}/inspect`),
+      fetchJSON(`${base}/dependencies`),
+    ]);
+
+    const a = artRes;
+    const inspect = inspectRes;
+    const deps = depsRes;
+
+    let html = '';
+
+    // Identity
+    html += `<div class="detail-section">
+      <div class="text-xs text-slate-500 uppercase tracking-wider mb-2">Identity</div>
+      <div class="space-y-1 text-sm">
+        <div><span class="text-slate-500">Kind:</span> <span class="text-slate-300">${a.kind}</span></div>
+        <div><span class="text-slate-500">Status:</span> <span class="badge badge-${a.status}">${a.status}</span></div>
+        <div><span class="text-slate-500">Version:</span> <span class="text-slate-300">${a.identity?.version}</span></div>
+        <div><span class="text-slate-500">Description:</span> <span class="text-slate-400">${a.identity?.description}</span></div>
+        ${a.metadata?.license ? `<div><span class="text-slate-500">License:</span> <span class="text-slate-300">${a.metadata.license}</span></div>` : ''}
+        ${a.metadata?.repository?.url ? `<div><span class="text-slate-500">Repo:</span> <a href="${a.metadata.repository.url}" class="text-blue-400 hover:underline" target="_blank">${a.metadata.repository.url}</a></div>` : ''}
+      </div>
+    </div>`;
+
+    // OCI Artifacts
+    if (a.artifacts?.length) {
+      html += `<div class="detail-section">
+        <div class="text-xs text-slate-500 uppercase tracking-wider mb-2">OCI Artifacts</div>
+        ${a.artifacts.map(ref => `<div class="text-sm text-slate-300 font-mono bg-slate-900 rounded px-2 py-1 mb-1">${ref.oci}${ref.digest ? `<br><span class="text-slate-500 text-xs">${ref.digest}</span>` : ''}</div>`).join('')}
+      </div>`;
+    }
+
+    // Eval records
+    const evalSummary = inspect.evalSummary;
+    html += `<div class="detail-section">
+      <div class="text-xs text-slate-500 uppercase tracking-wider mb-2">Eval Records (${evalSummary?.totalRecords || 0})</div>`;
+    if (evalSummary?.totalRecords > 0) {
+      const cats = evalSummary.categories || {};
+      html += `<div class="space-y-1 text-sm">`;
+      for (const [cat, count] of Object.entries(cats)) {
+        const color = cat === 'safety' ? 'text-yellow-400' : cat === 'red-team' ? 'text-red-400' : cat === 'functional' ? 'text-green-400' : 'text-slate-400';
+        html += `<div class="flex justify-between"><span class="${color}">${cat}</span><span class="text-slate-400">${count} record(s)</span></div>`;
+      }
+      html += `<div class="flex justify-between mt-2 pt-2 border-t border-slate-700"><span class="text-slate-500">Average score</span><span class="text-slate-200 font-medium">${evalSummary.averageScore?.toFixed(2)}</span></div>`;
+      html += `</div>`;
+    } else {
+      html += `<div class="text-sm text-slate-600">No eval records submitted</div>`;
+    }
+    html += `</div>`;
+
+    // Promotion history
+    const promotions = inspect.promotions || [];
+    html += `<div class="detail-section">
+      <div class="text-xs text-slate-500 uppercase tracking-wider mb-2">Promotion History</div>`;
+    if (promotions.length > 0) {
+      html += `<div class="space-y-0">`;
+      promotions.forEach((p, i) => {
+        html += `<div class="flex gap-3">
+          <div class="flex flex-col items-center">
+            <div class="timeline-dot"></div>
+            ${i < promotions.length - 1 ? '<div class="timeline-line flex-1"></div>' : ''}
+          </div>
+          <div class="pb-4">
+            <div class="text-sm text-slate-300">${p.from} &rarr; ${p.to}</div>
+            ${p.comment ? `<div class="text-xs text-slate-500 mt-0.5">${p.comment}</div>` : ''}
+            <div class="text-xs text-slate-600 mt-0.5">${formatTime(p.timestamp)}</div>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    } else {
+      html += `<div class="text-sm text-slate-600">No promotions yet</div>`;
+    }
+    html += `</div>`;
+
+    // Dependencies
+    html += `<div class="detail-section">
+      <div class="text-xs text-slate-500 uppercase tracking-wider mb-2">Dependencies</div>`;
+    if (deps.dependencies?.length > 0) {
+      html += `<div class="space-y-1 text-sm font-mono">`;
+      deps.dependencies.forEach(d => {
+        const resolved = d.resolved;
+        const icon = resolved ? '<span class="text-green-500">&#10003;</span>' : '<span class="text-red-500">&#10007;</span>';
+        const ver = d.version || d.versionConstraint || '?';
+        html += `<div>${icon} <span class="text-slate-400">${d.kind}</span> <span class="text-slate-300">${d.name}</span><span class="text-slate-500">@${ver}</span></div>`;
+      });
+      html += `</div>`;
+    } else {
+      html += `<div class="text-sm text-slate-600">No dependencies declared</div>`;
+    }
+    html += `</div>`;
+
+    content.innerHTML = html;
+  } catch (e) {
+    content.innerHTML = `<div class="text-red-400">Error: ${e.message}</div>`;
+  }
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.add('hidden');
+}
+
+function formatTime(ts) {
+  if (!ts) return '';
+  try { return new Date(ts).toLocaleString(); } catch { return ts; }
+}
+
+// --- Events ---
+
+document.getElementById('search').addEventListener('input', render);
+document.getElementById('status-filter').addEventListener('change', e => {
+  activeStatus = e.target.value;
+  render();
+});
+document.querySelectorAll('#kind-tabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#kind-tabs .tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    activeKind = tab.dataset.kind;
+    render();
+  });
+});
+
+// --- Init ---
+loadAll();
+</script>
+</body>
+</html>

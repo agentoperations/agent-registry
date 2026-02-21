@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Registry Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0d1117; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #e2e8f0; padding: 40px; }
+  h1 { text-align: center; font-size: 18px; font-weight: 600; letter-spacing: 2px; color: #94a3b8; margin-bottom: 32px; text-transform: uppercase; }
+  .diagram { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+
+  /* Lanes */
+  .lane { border-radius: 12px; padding: 16px 20px; }
+  .lane-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; opacity: 0.7; }
+  .lane-items { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .chip { padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; text-align: center; }
+
+  /* External lanes */
+  .lane-pub { background: #1c1917; border: 1px solid #44403c; }
+  .lane-pub .lane-label { color: #a8a29e; }
+  .lane-pub .chip { background: #292524; border: 1px solid #57534e; color: #e7e5e4; }
+
+  .lane-eval { background: #431407; border: 1px solid #9a3412; }
+  .lane-eval .lane-label { color: #fdba74; }
+  .lane-eval .chip { background: #7c2d12; border: 1px solid #ea580c; color: #fed7aa; }
+
+  .lane-con { background: #1c1917; border: 1px solid #44403c; }
+  .lane-con .lane-label { color: #a8a29e; }
+  .lane-con .chip { background: #292524; border: 1px solid #57534e; color: #e7e5e4; }
+
+  .lane-oci { background: #052e16; border: 1px solid #166534; }
+  .lane-oci .lane-label { color: #86efac; }
+  .lane-oci .chip { background: #14532d; border: 1px solid #22c55e; color: #dcfce7; font-size: 12px; }
+
+  /* Arrows */
+  .arrows { display: flex; justify-content: center; gap: 60px; padding: 4px 0; }
+  .arrow { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .arrow-line { width: 2px; height: 20px; background: #475569; }
+  .arrow-head { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #475569; }
+  .arrow-label { font-size: 10px; color: #94a3b8; text-align: center; line-height: 1.3; }
+
+  /* Registry box */
+  .registry { background: #1e293b; border: 1px solid #334155; border-radius: 14px; padding: 20px; }
+  .registry-label { font-size: 12px; font-weight: 700; letter-spacing: 2px; color: #64748b; text-transform: uppercase; margin-bottom: 16px; text-align: center; }
+
+  /* API bar */
+  .api-bar { background: #1e3a5f; border: 1px solid #3b82f6; border-radius: 8px; padding: 14px 20px; text-align: center; margin-bottom: 16px; }
+  .api-title { font-size: 14px; font-weight: 600; color: #93c5fd; }
+  .api-sub { font-size: 11px; color: #bfdbfe; margin-top: 4px; }
+
+  /* Engine row */
+  .engine-row { display: flex; gap: 10px; margin-bottom: 16px; justify-content: center; flex-wrap: wrap; }
+  .engine-box { background: #581c87; border: 1px solid #a855f7; border-radius: 8px; padding: 10px 14px; text-align: center; flex: 1; min-width: 150px; max-width: 220px; }
+  .engine-box .title { font-size: 12px; font-weight: 600; color: #d8b4fe; }
+  .engine-box .sub { font-size: 10px; color: #c4b5fd; margin-top: 3px; }
+
+  /* Connection line between engine and store */
+  .connector { display: flex; justify-content: center; padding: 4px 0; }
+  .connector-line { display: flex; align-items: center; gap: 6px; }
+  .connector-line .line { width: 40px; height: 2px; background: #475569; }
+  .connector-line .label { font-size: 9px; color: #94a3b8; white-space: nowrap; }
+  .v-line { width: 2px; height: 12px; background: #475569; margin: 0 auto; }
+  .v-arrow { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid #475569; margin: 0 auto; }
+
+  /* Store row */
+  .store { background: #450a0a; border: 1px solid #991b1b; border-radius: 10px; padding: 14px; }
+  .store-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; color: #fca5a5; text-transform: uppercase; margin-bottom: 10px; text-align: center; }
+  .store-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .store-item { background: #7f1d1d; border: 1px solid #ef4444; border-radius: 8px; padding: 10px 14px; text-align: center; flex: 1; min-width: 140px; max-width: 200px; }
+  .store-item .icon { font-size: 16px; margin-bottom: 4px; }
+  .store-item .title { font-size: 11px; font-weight: 600; color: #fecaca; }
+  .store-item .sub { font-size: 10px; color: #fca5a5; margin-top: 2px; }
+
+  /* Flow annotations */
+  .flow-row { display: flex; justify-content: space-between; align-items: center; padding: 0 20px; }
+  .flow-note { font-size: 10px; color: #64748b; font-style: italic; max-width: 200px; text-align: center; }
+
+  /* Horizontal arrows between sections */
+  .h-arrows { display: flex; justify-content: center; gap: 40px; padding: 6px 0; }
+  .h-arrow-label { font-size: 10px; color: #94a3b8; display: flex; align-items: center; gap: 4px; }
+  .h-arrow-label .tri-down { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid #94a3b8; }
+  .h-arrow-label .tri-up { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 5px solid #94a3b8; }
+</style>
+</head>
+<body>
+<h1>Agent Registry &mdash; Architecture</h1>
+<div class="diagram">
+
+  <!-- Row 1: Publishers + Eval Providers + Consumers -->
+  <div style="display: flex; gap: 12px;">
+    <div class="lane lane-pub" style="flex:1;">
+      <div class="lane-label">Publishers</div>
+      <div class="lane-items">
+        <div class="chip">Agent Dev</div>
+        <div class="chip">Skill Author</div>
+        <div class="chip">MCP Server Dev</div>
+      </div>
+    </div>
+    <div class="lane lane-eval" style="flex:1.4;">
+      <div class="lane-label">Eval Providers</div>
+      <div class="lane-items">
+        <div class="chip">eval-hub</div>
+        <div class="chip">Garak</div>
+        <div class="chip">lm-eval-harness</div>
+        <div class="chip">RAGAS</div>
+        <div class="chip">Custom</div>
+      </div>
+    </div>
+    <div class="lane lane-con" style="flex:1;">
+      <div class="lane-label">Consumers</div>
+      <div class="lane-items">
+        <div class="chip">Agent Runtimes</div>
+        <div class="chip">AI IDEs</div>
+        <div class="chip">CI/CD</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arrows down -->
+  <div class="arrows">
+    <div class="arrow">
+      <div class="arrow-label">push metadata</div>
+      <div class="arrow-line"></div>
+      <div class="arrow-head"></div>
+    </div>
+    <div class="arrow">
+      <div class="arrow-label">submit EvalRecords<br>(category + provider)</div>
+      <div class="arrow-line"></div>
+      <div class="arrow-head"></div>
+    </div>
+    <div class="arrow">
+      <div class="arrow-label">discover &<br>resolve deps</div>
+      <div class="arrow-line"></div>
+      <div class="arrow-head"></div>
+    </div>
+  </div>
+
+  <!-- Registry -->
+  <div class="registry">
+    <div class="registry-label">Agent Registry</div>
+
+    <!-- API bar -->
+    <div class="api-bar">
+      <div class="api-title">REST API &middot; /v1</div>
+      <div class="api-sub">CRUD &middot; Promotion &middot; Discovery &middot; Dependencies &middot; Federation</div>
+    </div>
+
+    <div class="v-line"></div>
+    <div class="v-arrow"></div>
+
+    <!-- Engine row -->
+    <div class="engine-row">
+      <div class="engine-box">
+        <div class="title">Schema Validator</div>
+        <div class="sub">JSON Schema 2020-12</div>
+      </div>
+      <div class="engine-box">
+        <div class="title">Lifecycle Manager</div>
+        <div class="sub">Promotion Gates</div>
+      </div>
+      <div class="engine-box">
+        <div class="title">Eval Processor</div>
+        <div class="sub">Provider-Agnostic &middot; Category-Aware</div>
+      </div>
+      <div class="engine-box">
+        <div class="title">Provenance Verifier</div>
+        <div class="sub">SLSA &middot; Sigstore &middot; SBOM</div>
+      </div>
+      <div class="engine-box">
+        <div class="title">Trust Engine</div>
+        <div class="sub">6-Component Weighted Scoring</div>
+      </div>
+    </div>
+
+    <!-- Flow note -->
+    <div style="text-align:center; margin-bottom:8px;">
+      <span style="font-size:10px; color:#94a3b8; background:#334155; padding:3px 10px; border-radius:4px;">
+        Eval Records &xrarr; category coverage &xrarr; Trust Engine
+      </span>
+    </div>
+
+    <div class="v-line"></div>
+    <div class="v-arrow"></div>
+
+    <!-- Metadata Store -->
+    <div class="store">
+      <div class="store-label">Metadata Store</div>
+      <div class="store-row">
+        <div class="store-item">
+          <div class="title">Artifacts</div>
+          <div class="sub">agent &middot; skill &middot; mcp-server</div>
+        </div>
+        <div class="store-item">
+          <div class="title">BOMs</div>
+          <div class="sub">models &middot; tools &middot; skills &middot; prompts</div>
+        </div>
+        <div class="store-item">
+          <div class="title">Eval Records</div>
+          <div class="sub">functional &middot; safety &middot; red-team &middot; perf</div>
+        </div>
+        <div class="store-item">
+          <div class="title">Trust Signals</div>
+          <div class="sub">composite &middot; safety &middot; red-team scores</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arrows to OCI -->
+  <div class="arrows">
+    <div class="arrow">
+      <div class="arrow-label">push images</div>
+      <div class="arrow-line"></div>
+      <div class="arrow-head"></div>
+    </div>
+    <div class="arrow" style="visibility:hidden;"></div>
+    <div class="arrow">
+      <div class="arrow-label">pull content</div>
+      <div class="arrow-line"></div>
+      <div class="arrow-head"></div>
+    </div>
+  </div>
+
+  <!-- OCI -->
+  <div class="lane lane-oci">
+    <div class="lane-label">OCI Registries</div>
+    <div class="lane-items">
+      <div class="chip">ghcr.io</div>
+      <div class="chip">quay.io</div>
+      <div class="chip">ECR / ACR</div>
+      <div class="chip" style="border-style:dashed;">Container Images & Skill Archives</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

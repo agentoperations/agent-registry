@@ -1,0 +1,129 @@
+# Agent Registry — Demo
+# Pre-req: run `bash docs/demo-setup.sh` first to start server + create artifacts
+# Record: showtime record docs/demo.show --narrate
+
+Set Shell "bash"
+Set Theme "github-dark"
+Set FontSize 16
+Set Width 110
+Set Height 30
+Set TypingSpeed 30ms
+Set Quality "high"
+Set WindowBar true
+Set Prompt "$ "
+Set Voice "onyx"
+Set VoiceInstructions "Professional and technical. Clear, concise narration for a developer audience."
+
+Output docs/agent-registry-demo.mp4
+
+# ---- Title ----
+Narrate "Welcome to the Agent Registry demo. We'll walk through the full user journey — pushing artifacts, attaching evaluations, promoting through the lifecycle, and inspecting the results."
+Type "echo ''"
+Enter
+Type "echo '  +--------------------------------------+'"
+Enter
+Type "echo '  |       Agent Registry -- Demo         |'"
+Enter
+Type "echo '  |  agents . skills . mcp-servers       |'"
+Enter
+Type "echo '  +--------------------------------------+'"
+Enter
+Type "echo ''"
+Enter
+Sleep 1s
+Wait
+
+# ---- Push artifacts ----
+Narrate "We start by pushing three artifact types. Each is a YAML manifest describing metadata, capabilities, and dependencies. The actual container images live in OCI registries — the registry only stores metadata."
+Type "agentctl push agents /tmp/demo-artifacts/agent.yaml"
+Enter
+Sleep 2s
+Wait
+
+Type "agentctl push skills /tmp/demo-artifacts/skill.yaml"
+Enter
+Sleep 1s
+
+Type "agentctl push mcp-servers /tmp/demo-artifacts/mcp-server.yaml"
+Enter
+Sleep 1s
+Wait
+
+# ---- List ----
+Narrate "All three artifacts land in draft status. Let's list them."
+Type "agentctl list agents"
+Enter
+Sleep 1s
+
+Type "agentctl list skills"
+Enter
+Sleep 1s
+
+Type "agentctl list mcp-servers"
+Enter
+Sleep 2s
+Wait
+
+# ---- Search ----
+Narrate "Full-text search works across all artifact kinds."
+Type "agentctl search kubernetes"
+Enter
+Sleep 2s
+Wait
+
+# ---- Eval records ----
+Narrate "Now we attach evaluation records from external tools. Garak provides safety and red-team results. Eval-hub provides functional benchmarks. The registry stores these signals — it doesn't run the evaluations."
+Type "agentctl eval attach agents acme/cluster-doctor 1.0.0 --category safety --provider garak --benchmark toxicity-detection --score 0.96 --evaluator ci-pipeline --method automated"
+Enter
+Sleep 1s
+
+Type "agentctl eval attach agents acme/cluster-doctor 1.0.0 --category red-team --provider garak --benchmark prompt-injection --score 0.91 --evaluator ci-pipeline --method automated"
+Enter
+Sleep 1s
+
+Type "agentctl eval attach agents acme/cluster-doctor 1.0.0 --category functional --provider eval-hub --benchmark k8s-diagnostics --score 0.88 --evaluator integration-tests --method automated"
+Enter
+Sleep 1s
+Wait
+
+Narrate "Three eval records attached. Let's view them."
+Type "agentctl eval list agents acme/cluster-doctor 1.0.0"
+Enter
+Sleep 2s
+Wait
+
+# ---- Promotion ----
+Narrate "Now we promote through the lifecycle. Draft to evaluated, approved, then published. Content becomes immutable after evaluation — what was tested is what gets shipped."
+Type "agentctl promote agents acme/cluster-doctor 1.0.0 --to evaluated --comment 'All evals pass'"
+Enter
+Sleep 1s
+
+Type "agentctl promote agents acme/cluster-doctor 1.0.0 --to approved --comment 'Reviewed by platform team'"
+Enter
+Sleep 1s
+
+Type "agentctl promote agents acme/cluster-doctor 1.0.0 --to published --comment 'Ready for production'"
+Enter
+Sleep 2s
+Wait
+
+# ---- Inspect ----
+Narrate "Inspect shows the full picture — current status, evaluation summary by category, and the complete promotion history with timestamps."
+Type "agentctl inspect agents acme/cluster-doctor 1.0.0"
+Enter
+Sleep 3s
+Wait
+
+# ---- Dependencies ----
+Narrate "The dependency graph is resolved from the Bill of Materials. The agent depends on two MCP servers, a skill, and a model. Kubernetes MCP is resolved — it's in the registry. Prometheus MCP is unresolved — it hasn't been registered yet."
+Type "agentctl deps agents acme/cluster-doctor 1.0.0"
+Enter
+Sleep 3s
+Wait
+
+# ---- Final listing ----
+Narrate "And here's the final state — a published agent, discoverable and ready for consumers to pull and deploy."
+Type "agentctl list agents --status published"
+Enter
+Sleep 2s
+Wait

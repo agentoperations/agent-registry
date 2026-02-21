@@ -2,10 +2,20 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agentregistry.dev/schemas/eval-record.schema.json",
   "title": "Evaluation Record",
-  "description": "Schema for evaluation records that capture benchmark results, metrics, and attestation for registry artifacts. Evaluation records provide the evidence base for trust scoring.",
+  "description": "Schema for evaluation records that capture benchmark results, metrics, and attestation for registry artifacts. Provider-agnostic: any evaluation framework (eval-hub, Garak, lm-evaluation-harness, RAGAS, or custom) can submit results conforming to this envelope.",
   "type": "object",
   "required": ["benchmark", "evaluator", "results", "context"],
   "properties": {
+    "category": {
+      "type": "string",
+      "enum": ["functional", "safety", "red-team", "performance", "custom"],
+      "default": "functional",
+      "description": "Evaluation category. 'functional' for capability/accuracy, 'safety' for alignment/harm prevention, 'red-team' for adversarial attack testing, 'performance' for latency/throughput, 'custom' for provider-defined types."
+    },
+    "provider": {
+      "$ref": "#/$defs/Provider",
+      "description": "Optional evaluation framework/provider that produced these results."
+    },
     "benchmark": {
       "$ref": "#/$defs/Benchmark",
       "description": "The benchmark or evaluation suite used."
@@ -29,6 +39,27 @@
   },
   "additionalProperties": false,
   "$defs": {
+    "Provider": {
+      "type": "object",
+      "description": "Evaluation framework or provider that produced these results. The registry treats providers as opaque — any string is accepted.",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Provider identifier (e.g., 'eval-hub', 'garak', 'lm-evaluation-harness', 'ragas', 'custom')."
+        },
+        "version": {
+          "type": "string",
+          "description": "Provider version."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL for the provider project or documentation."
+        }
+      },
+      "additionalProperties": false
+    },
     "Benchmark": {
       "type": "object",
       "description": "Identification of the benchmark or evaluation suite.",
