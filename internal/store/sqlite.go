@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentregistry/agent-registry/internal/model"
+	"github.com/agentoperations/agent-registry/internal/model"
 	_ "modernc.org/sqlite"
 )
 

@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/agentregistry/agent-registry/internal/server"
-	"github.com/agentregistry/agent-registry/internal/service"
-	"github.com/agentregistry/agent-registry/internal/store"
+	"github.com/agentoperations/agent-registry/internal/server"
+	"github.com/agentoperations/agent-registry/internal/service"
+	"github.com/agentoperations/agent-registry/internal/store"
 	"github.com/spf13/cobra"
 )
 

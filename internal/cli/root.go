@@ -5,7 +5,7 @@ import (
 	"io/fs"
 	"os"
 
-	"github.com/agentregistry/agent-registry/pkg/client"
+	"github.com/agentoperations/agent-registry/pkg/client"
 	"github.com/spf13/cobra"
 )
 

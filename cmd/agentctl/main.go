@@ -4,7 +4,7 @@ import (
 	"embed"
 	"io/fs"
 
-	"github.com/agentregistry/agent-registry/internal/cli"
+	"github.com/agentoperations/agent-registry/internal/cli"
 )
 
 //go:embed ui

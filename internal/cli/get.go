@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/agentregistry/agent-registry/internal/model"
+	"github.com/agentoperations/agent-registry/internal/model"
 	"github.com/spf13/cobra"
 )
 

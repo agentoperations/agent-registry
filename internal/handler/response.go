@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/agentregistry/agent-registry/internal/model"
+	"github.com/agentoperations/agent-registry/internal/model"
 	"github.com/google/uuid"
 )
 

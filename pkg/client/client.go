@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/agentregistry/agent-registry/internal/model"
+	"github.com/agentoperations/agent-registry/internal/model"
 )
 
 type Client struct {

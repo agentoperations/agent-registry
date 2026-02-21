@@ -4,8 +4,8 @@ import (
 	"io/fs"
 	"net/http"
 
-	"github.com/agentregistry/agent-registry/internal/handler"
-	"github.com/agentregistry/agent-registry/internal/service"
+	"github.com/agentoperations/agent-registry/internal/handler"
+	"github.com/agentoperations/agent-registry/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )

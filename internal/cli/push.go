@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/agentregistry/agent-registry/internal/model"
+	"github.com/agentoperations/agent-registry/internal/model"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )

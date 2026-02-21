@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"github.com/agentregistry/agent-registry/internal/model"
+	"github.com/agentoperations/agent-registry/internal/model"
 )
 
 // RegistryService defines the business logic interface.

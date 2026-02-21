@@ -121,7 +121,7 @@ echo '/_/   \_\__, |\___|_| |_|\__| |_| \_\___|\__, |_|___/\__|_|   \__, |'
 echo '        |___/                             |___/                |___/ '
 echo -e "${NC}"
 echo -e "${DIM}  A vendor-neutral registry for AI agents, skills, and MCP servers.${NC}"
-echo -e "${DIM}  Spec: https://github.com/agentregistry/agent-registry-spec${NC}"
+echo -e "${DIM}  https://github.com/agentoperations/agent-registry${NC}"
 echo ""
 separator
 

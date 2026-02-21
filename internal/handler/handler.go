@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/agentregistry/agent-registry/internal/model"
-	"github.com/agentregistry/agent-registry/internal/service"
-	"github.com/agentregistry/agent-registry/internal/store"
+	"github.com/agentoperations/agent-registry/internal/model"
+	"github.com/agentoperations/agent-registry/internal/service"
+	"github.com/agentoperations/agent-registry/internal/store"
 	"github.com/go-chi/chi/v5"
 )
 

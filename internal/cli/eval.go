@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/agentregistry/agent-registry/internal/model"
+	"github.com/agentoperations/agent-registry/internal/model"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )

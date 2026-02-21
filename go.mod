@@ -1,4 +1,4 @@
-module github.com/agentregistry/agent-registry
+module github.com/agentoperations/agent-registry
 
 go 1.24.0
 
