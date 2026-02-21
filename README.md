@@ -42,9 +42,11 @@ Narration requires `OPENAI_API_KEY` to be set and `ffmpeg` for MP4 output.
 
 A reveal.js slide deck covering the problem, architecture, and workflow:
 
-[View presentation](https://htmlpreview.github.io/?https://github.com/zanetworker/agent-registry-spec/blob/main/docs/presentation.html) | [Source](docs/presentation.html)
+```bash
+open docs/presentation.html
+```
 
-Open locally: `open docs/presentation.html`
+The deck is a self-contained HTML file using reveal.js from CDN — no build step needed. [Source](docs/presentation.html)
 
 ### Web UI
 
