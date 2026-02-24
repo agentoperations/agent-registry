@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -103,7 +104,16 @@ type RegistryArtifact struct {
 	Identity  Identity       `json:"identity" yaml:"identity"`
 	Kind      Kind           `json:"kind" yaml:"kind"`
 	Artifacts []OCIReference `json:"artifacts" yaml:"artifacts"`
-	Metadata  *Metadata      `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+
+	// Standard identity documents (envelope model — one per kind)
+	AgentCard        json.RawMessage `json:"agentCard,omitempty" yaml:"agentCard,omitempty"`
+	AgentCardOrigin  string          `json:"agentCardOrigin,omitempty" yaml:"agentCardOrigin,omitempty"`
+	ServerJson       json.RawMessage `json:"serverJson,omitempty" yaml:"serverJson,omitempty"`
+	ServerJsonOrigin string          `json:"serverJsonOrigin,omitempty" yaml:"serverJsonOrigin,omitempty"`
+	SkillMd          json.RawMessage `json:"skillMd,omitempty" yaml:"skillMd,omitempty"`
+	SkillMdOrigin    string          `json:"skillMdOrigin,omitempty" yaml:"skillMdOrigin,omitempty"`
+
+	Metadata *Metadata `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	// Kind-specific extensions (agent, skill, mcp-server)
 	Capabilities json.RawMessage `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
@@ -134,6 +144,119 @@ func (a *RegistryArtifact) Namespace() string {
 		return parts[0]
 	}
 	return "_default"
+}
+
+// ExtractIdentity populates Identity fields from the standard document.
+func (a *RegistryArtifact) ExtractIdentity() error {
+	switch a.Kind {
+	case KindAgent:
+		return a.extractFromAgentCard()
+	case KindMCPServer:
+		return a.extractFromServerJson()
+	case KindSkill:
+		return a.extractFromSkillMd()
+	}
+	return fmt.Errorf("unknown kind: %s", a.Kind)
+}
+
+func (a *RegistryArtifact) extractFromAgentCard() error {
+	if len(a.AgentCard) == 0 {
+		return nil
+	}
+	var card struct {
+		Name        string `json:"name"`
+		Version     string `json:"version"`
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(a.AgentCard, &card); err != nil {
+		return fmt.Errorf("parse agentCard: %w", err)
+	}
+	if card.Name == "" || card.Version == "" {
+		return fmt.Errorf("agentCard missing required fields: name, version")
+	}
+	ns := a.Namespace()
+	a.Identity.Title = card.Name
+	a.Identity.Description = card.Description
+	a.Identity.Version = card.Version
+	if !strings.Contains(a.Identity.Name, "/") || a.Identity.Name == ns {
+		a.Identity.Name = ns + "/" + strings.ToLower(strings.ReplaceAll(card.Name, " ", "-"))
+	}
+	return nil
+}
+
+func (a *RegistryArtifact) extractFromServerJson() error {
+	if len(a.ServerJson) == 0 {
+		return nil
+	}
+	var sj struct {
+		Name        string `json:"name"`
+		Version     string `json:"version"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(a.ServerJson, &sj); err != nil {
+		return fmt.Errorf("parse serverJson: %w", err)
+	}
+	if sj.Name == "" || sj.Version == "" {
+		return fmt.Errorf("serverJson missing required fields: name, version")
+	}
+	a.Identity.Version = sj.Version
+	a.Identity.Description = sj.Description
+	if sj.Title != "" {
+		a.Identity.Title = sj.Title
+	} else {
+		a.Identity.Title = sj.Name
+	}
+	// If identity.name doesn't have a namespace prefix, use server.json name
+	if !strings.Contains(a.Identity.Name, "/") {
+		a.Identity.Name = sj.Name
+	}
+	return nil
+}
+
+func (a *RegistryArtifact) extractFromSkillMd() error {
+	if len(a.SkillMd) == 0 {
+		return nil
+	}
+	var sm struct {
+		Name        string            `json:"name"`
+		Description string            `json:"description"`
+		Metadata    map[string]string `json:"metadata"`
+	}
+	if err := json.Unmarshal(a.SkillMd, &sm); err != nil {
+		return fmt.Errorf("parse skillMd: %w", err)
+	}
+	if sm.Name == "" {
+		return fmt.Errorf("skillMd missing required field: name")
+	}
+	ns := a.Namespace()
+	a.Identity.Title = sm.Name
+	a.Identity.Description = sm.Description
+	if v, ok := sm.Metadata["version"]; ok {
+		a.Identity.Version = v
+	}
+	if !strings.Contains(a.Identity.Name, "/") || a.Identity.Name == ns {
+		a.Identity.Name = ns + "/" + sm.Name
+	}
+	return nil
+}
+
+// StandardDocument returns the standard doc for this artifact's kind.
+func (a *RegistryArtifact) StandardDocument() json.RawMessage {
+	switch a.Kind {
+	case KindAgent:
+		return a.AgentCard
+	case KindMCPServer:
+		return a.ServerJson
+	case KindSkill:
+		return a.SkillMd
+	}
+	return nil
+}
+
+// HasStandardDocument returns true if a standard doc is present.
+func (a *RegistryArtifact) HasStandardDocument() bool {
+	return len(a.StandardDocument()) > 0
 }
 
 // ArtifactFilter holds query parameters for listing artifacts.
