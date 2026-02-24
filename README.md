@@ -42,24 +42,42 @@ The server embeds a catalog UI at the root URL. Browse artifacts by kind, filter
 You build an agent        agentctl does the rest            Others find it
 ──────────────────        ────────────────────              ──────────────
 
-docker push image    ──>  agentctl init --path .            agentctl search "k8s"
-                          (LLM reads your code,             agentctl inspect ...
-                           generates manifest)              agentctl deps ...
-                                                            agentctl get ... -> docker pull
-                     ──>  agentctl push agents m.yaml
-                          (draft — private, mutable)
+docker push image    ──>  agentctl push agents card.json    agentctl search "k8s"
+                          --namespace acme                  agentctl inspect ...
+                          --oci ghcr.io/acme/agent:1.0      agentctl deps ...
+                          (draft — private, mutable)        agentctl get ... --format a2a
 
-                     ──>  agentctl eval attach ...          Evals are optional.
-                          (external tools submit results)   Any tool can POST /evals.
-
-                     ──>  agentctl promote --to evaluated   Content locks here.
-                     ──>  agentctl promote --to approved
-                     ──>  agentctl promote --to published   Now discoverable.
+                 or  ──>  agentctl init --path .            # import from a running agent
+                          (LLM generates AgentCard)         agentctl import --from-a2a \
+                                                              https://agent/.well-known/agent-card.json
+                     ──>  agentctl eval attach ...
+                          (external tools submit results)   # export for deployment
+                                                            agentctl get agents acme/x 1.0 \
+                     ──>  agentctl promote --to evaluated     --format a2a > agent-card.json
+                     ──>  agentctl promote --to approved    # serve at /.well-known/agent-card.json
+                     ──>  agentctl promote --to published
 ```
+
+### Standards-based identity
+
+Each artifact kind uses an open standard as its native identity format. The registry wraps it with governance.
+
+| Kind | Standard | What it carries | What the registry adds |
+|------|----------|----------------|----------------------|
+| Agent | [A2A AgentCard](https://github.com/google-a2a/A2A) | Name, version, skills, capabilities, security, signatures | BOM, evals, promotion, provenance, trust |
+| MCP Server | [MCP server.json](https://github.com/modelcontextprotocol/registry) | Name, version, packages, transport | BOM, evals, promotion, provenance, trust |
+| Skill | [Agent Skills (SKILL.md)](https://agentskills.io) | Name, description, instructions | BOM, evals, promotion, provenance, trust |
 
 ### Step by step
 
-**Generate a manifest.** Point `agentctl init` at your project. An LLM scans source code, Dockerfile, dependencies, and README to produce a complete YAML manifest. No manual YAML writing.
+**Push a standard document directly.** Pass an A2A AgentCard, MCP server.json, or SKILL.md with `--namespace` and `--oci`. The registry extracts identity from the standard doc.
+
+```bash
+agentctl push agents agent-card.json \
+    --namespace acme --oci ghcr.io/acme/my-agent:1.0.0
+```
+
+**Or generate one.** Point `agentctl init` at your project. An LLM scans source code, Dockerfile, dependencies, and README to produce a manifest. No manual YAML writing.
 
 ```bash
 agentctl config set init.provider openai
@@ -69,7 +87,7 @@ agentctl init --path ./my-agent --image ghcr.io/acme/my-agent:1.0.0 -o manifest.
 
 Works with Anthropic (Messages API), OpenAI (Chat Completions, Responses API), or any compatible endpoint (Ollama, vLLM, LiteLLM) via `--base-url`.
 
-**Push it.** Lands in `draft` status.
+**Or use a full registry manifest.** The legacy YAML format still works.
 
 ```bash
 agentctl push agents manifest.yaml
@@ -139,6 +157,7 @@ All under `/api/v1`. Responses wrapped in `{ "data": ..., "_meta": {...}, "pagin
 | GET | `/{kind}/{ns}/{name}/versions/{ver}/evals` | List evals |
 | GET | `/{kind}/{ns}/{name}/versions/{ver}/inspect` | Inspect |
 | GET | `/{kind}/{ns}/{name}/versions/{ver}/dependencies` | Deps |
+| GET | `/{kind}/{ns}/{name}/versions/{ver}/export` | Export standard doc |
 | GET | `/search?q=...` | Search |
 | GET | `/ping` | Health |
 
@@ -236,13 +255,17 @@ docs/               Presentation, architecture diagrams, screenshots
 
 ## Design
 
+**Standards for identity, registry for governance.** Each artifact kind uses an open standard (A2A AgentCard, MCP server.json, Agent Skills) as its native identity and capability format. The registry wraps these with governance: promotion lifecycle, evaluation records, BOM, provenance, and trust signals. The standard document answers "what is this and how do I use it?" The registry answers "should I trust it, what does it depend on, and who says it's ready?"
+
 **Metadata, not payloads.** The registry indexes OCI artifacts. Binary content stays in ghcr.io / quay.io / ECR.
 
-**Three artifact kinds** share identity, versioning, and promotion lifecycle. They differ in BOM structure: agents declare models + tools + skills, skills declare tool requirements, MCP servers declare transport + tools.
+**Three artifact kinds** share promotion lifecycle, eval records, and BOM. They differ in their standard identity document and BOM structure: agents declare models + tools + skills, skills declare tool requirements, MCP servers declare runtime dependencies + external services.
 
 **Evals are external signals.** The registry accepts eval records from any tool (Garak, eval-hub, lm-eval-harness, custom CI). It does not run evaluations or compute trust scores. Trust scoring is a separate concern.
 
 **Promotion is a state machine.** `draft -> evaluated -> approved -> published -> deprecated -> archived`. No hardcoded gates. Policy layers can be added externally.
+
+**Import and export.** Push a standard document directly, or import from a URL (`/.well-known/agent-card.json`). Export the standard document for deployment with no governance wrapping.
 
 **CLI is a thin client.** All logic is server-side. Any entry point (CLI, curl, UI, CI pipeline) behaves identically.
 
