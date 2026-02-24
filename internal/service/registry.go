@@ -22,6 +22,18 @@ func (s *registryService) CreateArtifact(ctx context.Context, kind model.Kind, a
 	a.Kind = kind
 	a.Status = model.StatusDraft
 
+	// If a standard document is present, extract identity fields from it
+	if a.HasStandardDocument() {
+		if err := a.ExtractIdentity(); err != nil {
+			return nil, fmt.Errorf("extract identity from standard document: %w", err)
+		}
+	}
+
+	// Validate: must have name and version after extraction
+	if a.Identity.Name == "" || a.Identity.Version == "" {
+		return nil, fmt.Errorf("artifact must have name and version (via identity or standard document)")
+	}
+
 	if _, err := s.store.CreateArtifact(ctx, a); err != nil {
 		return nil, err
 	}
