@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/agentoperations/agent-registry/internal/model"
 )
@@ -26,4 +27,6 @@ type RegistryService interface {
 	Search(ctx context.Context, query string, kinds []model.Kind, limit, offset int) ([]*model.RegistryArtifact, int, error)
 
 	GetDependencies(ctx context.Context, kind model.Kind, name, version string) (*model.DependencyGraph, error)
+
+	ExportStandardDoc(ctx context.Context, kind model.Kind, name, version string) (json.RawMessage, string, error)
 }

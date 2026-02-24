@@ -4,7 +4,7 @@
   "title": "Registry Artifact",
   "description": "Base schema for all registry artifacts. Uses the 'kind' discriminator to select agent, skill, or mcp-server specific extensions. Supports three progressive disclosure tiers: Tier 0 (minimal), Tier 1 (standard), and Tier 2 (production).",
   "type": "object",
-  "required": ["identity", "kind", "artifacts"],
+  "required": ["kind", "artifacts"],
   "properties": {
     "identity": {
       "$ref": "#/$defs/Identity",
@@ -49,6 +49,33 @@
     "deprecation": {
       "$ref": "#/$defs/Deprecation",
       "description": "Deprecation notice. Only applicable when status is 'deprecated'."
+    },
+    "agentCard": {
+      "type": "object",
+      "description": "A2A AgentCard document (verbatim, for kind=agent)"
+    },
+    "agentCardOrigin": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL where the AgentCard was fetched from"
+    },
+    "serverJson": {
+      "type": "object",
+      "description": "MCP server.json document (verbatim, for kind=mcp-server)"
+    },
+    "serverJsonOrigin": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL where the server.json was fetched from"
+    },
+    "skillMd": {
+      "type": "object",
+      "description": "Agent Skills SKILL.md parsed content (for kind=skill)"
+    },
+    "skillMdOrigin": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL where the SKILL.md was fetched from"
     }
   },
   "oneOf": [

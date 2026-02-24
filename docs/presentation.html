@@ -78,7 +78,7 @@
 
 <!-- ============ TITLE ============ -->
 <section>
-  <p style="font-size:0.4em; color:#30363d; font-family:'JetBrains Mono',monospace; margin-bottom:30px;">v0.1.0</p>
+  <p style="font-size:0.4em; color:#30363d; font-family:'JetBrains Mono',monospace; margin-bottom:30px;">v0.2.0</p>
   <h1>agent<span style="color:#58a6ff;">registry</span></h1>
   <p class="subtitle">a vendor-neutral registry for AI agents, skills, and MCP servers</p>
   <br>
@@ -119,6 +119,25 @@
   </div>
 </section>
 
+<!-- ============ BUILT ON STANDARDS ============ -->
+<section>
+  <h2>Built on Open Standards</h2>
+  <p style="font-size:0.7em; color:#94a3b8; margin-bottom:20px;">Each artifact kind uses an open standard as its native identity format.</p>
+  <table>
+    <thead>
+      <tr><th>Kind</th><th>Standard</th><th>Steward</th><th>What it carries</th></tr>
+    </thead>
+    <tbody>
+      <tr class="fragment"><td><span class="badge badge-blue">Agent</span></td><td>A2A AgentCard</td><td>Google / AAIF</td><td>Name, skills, capabilities, security, signatures</td></tr>
+      <tr class="fragment"><td><span class="badge badge-green">MCP Server</span></td><td>MCP server.json</td><td>Anthropic / AAIF</td><td>Name, packages, transport, runtime</td></tr>
+      <tr class="fragment"><td><span class="badge badge-purple">Skill</span></td><td>Agent Skills (SKILL.md)</td><td>Anthropic</td><td>Name, description, instructions</td></tr>
+    </tbody>
+  </table>
+  <div class="fragment flow-box" style="margin-top:20px;">
+    The registry doesn't reinvent identity schemas &mdash; it wraps these standards with <strong>governance</strong>: promotion lifecycle, eval records, BOM, provenance, trust signals
+  </div>
+</section>
+
 <!-- ============ THREE ARTIFACT KINDS ============ -->
 <section>
   <h2>Three Artifact Kinds</h2>
@@ -126,28 +145,28 @@
     <div>
       <h3><span class="badge badge-blue">Agent</span></h3>
       <ul>
+        <li class="fragment">Identity: <strong>A2A AgentCard</strong></li>
         <li class="fragment">Autonomous AI system with its own runtime</li>
-        <li class="fragment">Declares models, tools, skills, orchestration</li>
-        <li class="fragment">Has a container image in OCI</li>
+        <li class="fragment">BOM declares models, tools, skills, orchestration</li>
       </ul>
       <br>
       <h3><span class="badge badge-purple">Skill</span></h3>
       <ul>
+        <li class="fragment">Identity: <strong>Agent Skills (SKILL.md)</strong></li>
         <li class="fragment">Prompt-based capability, no runtime</li>
-        <li class="fragment">Consumed by agents or AI IDEs</li>
-        <li class="fragment">Declares tool requirements, not concrete tools</li>
+        <li class="fragment">BOM declares tool and model requirements</li>
       </ul>
     </div>
     <div>
       <h3><span class="badge badge-green">MCP Server</span></h3>
       <ul>
+        <li class="fragment">Identity: <strong>MCP server.json</strong></li>
         <li class="fragment">Model Context Protocol server</li>
-        <li class="fragment">Exposes tools, resources, prompts</li>
-        <li class="fragment">Declares transport (stdio, HTTP, SSE)</li>
+        <li class="fragment">BOM declares runtime deps, external services</li>
       </ul>
       <br>
       <div class="fragment" style="margin-top:20px;">
-        <p style="font-size:0.7em; color:#94a3b8;">All three share:<br>identity, versioning, promotion lifecycle, eval records, BOM</p>
+        <p style="font-size:0.7em; color:#94a3b8;">All three share:<br>promotion lifecycle, eval records, BOM, provenance</p>
       </div>
     </div>
   </div>
@@ -160,40 +179,38 @@
 You build an agent        agentctl does the rest            Others find it
 ──────────────────        ────────────────────              ──────────────
 
-docker push image    ──>  agentctl init --path .            agentctl search "k8s"
-                          (LLM reads your code,             agentctl inspect ...
-                           generates manifest)              agentctl deps ...
-                                                            agentctl get ...
-                     ──>  agentctl push agents m.yaml              ↓
-                          (draft — private, mutable)        docker pull + deploy
-
+docker push image    ──>  agentctl push agents card.json    agentctl search "k8s"
+                          --namespace acme                  agentctl get ... --format a2a
+                          --oci ghcr.io/acme/x:1.0                 ↓
+                          (draft — private, mutable)        serve at /.well-known/
+                                                            agent-card.json
                      ──>  agentctl eval attach ...
-                          (external tools submit results)
-
-                     ──>  agentctl promote --to evaluated   Content locks here.
-                     ──>  agentctl promote --to approved
-                     ──>  agentctl promote --to published   Now discoverable.
+                          (external tools submit results)   # or import from a running agent
+                                                            agentctl import --from-a2a
+                     ──>  agentctl promote --to evaluated     https://agent/.well-known/
+                     ──>  agentctl promote --to approved       agent-card.json
+                     ──>  agentctl promote --to published
   </code></pre>
 </section>
 
-<!-- ============ MANIFEST GENERATION ============ -->
+<!-- ============ PUSH STANDARD DOC ============ -->
 <section>
-  <h2>Step 1: Generate Manifest</h2>
-  <p style="font-size:0.7em; color:#94a3b8;">LLM reads your source code and generates the full YAML. No manual writing.</p>
+  <h2>Step 1: Push a Standard Document</h2>
+  <p style="font-size:0.7em; color:#94a3b8;">Push an A2A AgentCard directly. The registry extracts identity from the standard doc.</p>
   <pre class="fragment"><code class="language-bash" data-trim>
+# Push an A2A AgentCard
+agentctl push agents agent-card.json \
+    --namespace acme \
+    --oci ghcr.io/acme/cluster-doctor:1.0.0
+  </code></pre>
+  <pre class="fragment"><code class="language-bash" data-trim>
+# Or generate one from source code (LLM-powered)
 agentctl init --path ./my-agent \
     --image ghcr.io/acme/cluster-doctor:1.0.0 \
     -o manifest.yaml
   </code></pre>
   <div class="fragment">
-    <p style="font-size:0.6em; color:#94a3b8; margin-top:20px;">Supports any LLM provider:</p>
-    <p>
-      <span class="badge badge-blue">Anthropic</span>
-      <span class="badge badge-green">OpenAI</span>
-      <span class="badge badge-orange">Ollama</span>
-      <span class="badge badge-purple">vLLM</span>
-      <span class="badge badge-gray">Any OpenAI-compatible</span>
-    </p>
+    <p style="font-size:0.6em; color:#94a3b8; margin-top:10px;">Also works with MCP server.json and SKILL.md directories</p>
   </div>
 </section>
 
@@ -287,6 +304,29 @@ agent acme/cluster-doctor@1.0.0
   </div>
 </section>
 
+<!-- ============ GOVERNANCE ENVELOPE ============ -->
+<section>
+  <h2>The Governance Envelope</h2>
+  <div style="font-size:0.65em;">
+    <div class="flow-box" style="border-left-color:#58a6ff; text-align:center;">
+      <strong>Standard Identity Document</strong><br>
+      <span style="color:#8b949e;">agent &rarr; A2A AgentCard &nbsp;|&nbsp; mcp-server &rarr; MCP server.json &nbsp;|&nbsp; skill &rarr; SKILL.md</span><br>
+      <span style="color:#58a6ff;">WHO is this? WHAT can it do? HOW do I talk to it?</span>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <div class="fragment flow-box green" style="flex:1;"><strong>artifacts[]</strong><br>OCI references</div>
+      <div class="fragment flow-box purple" style="flex:1;"><strong>bom</strong><br>Dependency graph</div>
+      <div class="fragment flow-box orange" style="flex:1;"><strong>promotion</strong><br>draft&rarr;published</div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <div class="fragment flow-box" style="flex:1;"><strong>evalRecords[]</strong><br>External eval signals</div>
+      <div class="fragment flow-box red" style="flex:1;"><strong>provenance</strong><br>SLSA, Sigstore, SBOM</div>
+      <div class="fragment flow-box" style="flex:1; border-left-color:#fbbf24;"><strong>trustSignals</strong><br>Composite score</div>
+    </div>
+  </div>
+  <p class="fragment" style="font-size:0.6em; color:#94a3b8; margin-top:15px;">Standard doc = identity. Registry = governance. No field duplication.</p>
+</section>
+
 <!-- ============ ARCHITECTURE ============ -->
 <section>
   <h2>Architecture</h2>
@@ -310,12 +350,12 @@ agent acme/cluster-doctor@1.0.0
 <section>
   <h2>Design Principles</h2>
   <ul>
+    <li class="fragment"><strong>Standards for identity, registry for governance</strong> &mdash; A2A, MCP, Agent Skills own identity; registry owns lifecycle</li>
     <li class="fragment"><strong>Metadata, not payloads</strong> &mdash; binary content stays in OCI registries</li>
     <li class="fragment"><strong>Evals are external signals</strong> &mdash; the registry stores them, doesn't compute trust</li>
     <li class="fragment"><strong>Promotion is a state machine</strong> &mdash; no hardcoded gates, policy layers add externally</li>
+    <li class="fragment"><strong>Import and export</strong> &mdash; round-trip standard docs; deploy directly from registry</li>
     <li class="fragment"><strong>CLI is a thin client</strong> &mdash; all logic server-side, any entry point behaves identically</li>
-    <li class="fragment"><strong>Store is swappable</strong> &mdash; SQLite for PoC, Postgres for production</li>
-    <li class="fragment"><strong>Manifest generation is LLM-powered</strong> &mdash; zero YAML writing for developers</li>
   </ul>
 </section>
 
@@ -323,12 +363,12 @@ agent acme/cluster-doctor@1.0.0
 <section>
   <h2>What's Next</h2>
   <ul>
+    <li class="fragment">Kagenti integration &mdash; auto-discover agents via A2A, populate registry</li>
+    <li class="fragment">MLflow entity/version pattern &mdash; agent versions as AgentCards</li>
     <li class="fragment">Trust scoring as a pluggable external service (TrustyAI integration)</li>
     <li class="fragment">Configurable promotion gates (webhook-based policy engine)</li>
-    <li class="fragment">OCI registry integration (push + pull content from the registry)</li>
     <li class="fragment">Federation (peer discovery, cross-registry search, sync)</li>
     <li class="fragment">Authentication and RBAC</li>
-    <li class="fragment">Postgres backend for production</li>
   </ul>
 </section>
 

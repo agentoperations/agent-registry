@@ -22,6 +22,18 @@ func (s *registryService) CreateArtifact(ctx context.Context, kind model.Kind, a
 	a.Kind = kind
 	a.Status = model.StatusDraft
 
+	// If a standard document is present, extract identity fields from it
+	if a.HasStandardDocument() {
+		if err := a.ExtractIdentity(); err != nil {
+			return nil, fmt.Errorf("extract identity from standard document: %w", err)
+		}
+	}
+
+	// Validate: must have name and version after extraction
+	if a.Identity.Name == "" || a.Identity.Version == "" {
+		return nil, fmt.Errorf("artifact must have name and version (via identity or standard document)")
+	}
+
 	if _, err := s.store.CreateArtifact(ctx, a); err != nil {
 		return nil, err
 	}
@@ -190,6 +202,19 @@ func (s *registryService) GetDependencies(ctx context.Context, kind model.Kind, 
 	}
 
 	return graph, nil
+}
+
+func (s *registryService) ExportStandardDoc(ctx context.Context, kind model.Kind, name, version string) (json.RawMessage, string, error) {
+	a, err := s.GetArtifact(ctx, kind, name, version)
+	if err != nil {
+		return nil, "", err
+	}
+	doc := a.StandardDocument()
+	if len(doc) == 0 {
+		return nil, "", fmt.Errorf("artifact has no standard document")
+	}
+	contentType := "application/json"
+	return doc, contentType, nil
 }
 
 func (s *registryService) resolveAgentBOM(ctx context.Context, bomRaw json.RawMessage) []model.DependencyNode {

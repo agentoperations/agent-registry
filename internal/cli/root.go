@@ -44,6 +44,7 @@ func NewRootCmd() *cobra.Command {
 		newConfigCmd(),
 		newInitCmd(),
 		newPushCmd(),
+		newImportCmd(),
 		newGetCmd(),
 		newListCmd(),
 		newDeleteCmd(),

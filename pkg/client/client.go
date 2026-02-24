@@ -217,6 +217,40 @@ func (c *Client) Ping() error {
 	return err
 }
 
+func (c *Client) ExportStandardDoc(kind, name, version string) (json.RawMessage, error) {
+	parts := splitName(name)
+	path := fmt.Sprintf("/api/v1/%s/%s/versions/%s/export", kind, parts, version)
+
+	req, err := http.NewRequest("GET", c.BaseURL+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	if c.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		var problem model.ProblemDetail
+		if err := json.Unmarshal(body, &problem); err == nil && problem.Detail != "" {
+			return nil, fmt.Errorf("%s (HTTP %d)", problem.Detail, resp.StatusCode)
+		}
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
+	}
+	return body, nil
+}
+
 // splitName returns the name as a URL path segment: "acme/my-agent" -> "acme/my-agent"
 func splitName(name string) string {
 	return name
