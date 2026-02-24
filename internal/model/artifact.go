@@ -138,10 +138,15 @@ type RegistryArtifact struct {
 }
 
 // Namespace extracts the namespace from the fully qualified name.
+// If the name has no slash, treats the entire name as the namespace
+// (supports --namespace flag where name is set to just the namespace).
 func (a *RegistryArtifact) Namespace() string {
 	parts := strings.SplitN(a.Identity.Name, "/", 2)
 	if len(parts) == 2 {
 		return parts[0]
+	}
+	if a.Identity.Name != "" {
+		return a.Identity.Name
 	}
 	return "_default"
 }
