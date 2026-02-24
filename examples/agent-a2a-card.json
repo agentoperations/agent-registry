@@ -1,0 +1,38 @@
+{
+  "name": "Recipe Agent",
+  "description": "Agent that helps users find and customize recipes based on ingredients, dietary preferences, and cuisine type.",
+  "version": "1.0.0",
+  "supportedInterfaces": [
+    {
+      "url": "https://api.example.com/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+    }
+  ],
+  "provider": {
+    "organization": "Acme Corp",
+    "url": "https://acme.example.com"
+  },
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false
+  },
+  "defaultInputModes": ["text/plain", "application/json"],
+  "defaultOutputModes": ["text/plain", "application/json"],
+  "skills": [
+    {
+      "id": "find-recipe",
+      "name": "Find Recipe",
+      "description": "Finds recipes based on ingredients or cuisine type",
+      "tags": ["cooking", "recipes", "food"],
+      "examples": ["Find me a pasta recipe", "What can I make with chicken and rice?"]
+    },
+    {
+      "id": "nutrition-info",
+      "name": "Nutrition Information",
+      "description": "Provides nutritional breakdown for recipes or ingredients",
+      "tags": ["nutrition", "health", "calories"],
+      "examples": ["How many calories in a Caesar salad?"]
+    }
+  ]
+}

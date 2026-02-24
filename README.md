@@ -2,6 +2,8 @@
 
 A vendor-neutral, agent-framework-agnostic registry for AI agents, skills, and MCP servers.
 
+Built on open standards: [A2A AgentCard](https://github.com/google-a2a/A2A) for agents, [MCP server.json](https://github.com/modelcontextprotocol/registry) for MCP servers, and [Agent Skills](https://agentskills.io) for skills.
+
 Stores metadata alongside OCI registries. Accepts evaluation signals from external tools. Enforces a promotion lifecycle. Works with any agent framework. Does not store binaries or compute trust scores.
 
 ![Architecture](docs/architecture.png)
@@ -24,9 +26,7 @@ open http://localhost:8080
 
 Slide deck covering the problem, architecture, and workflow:
 
-```bash
-open docs/presentation.html
-```
+[View presentation](https://agentoperations.github.io/agent-registry/presentation.html)
 
 ### Web UI
 
@@ -108,7 +108,8 @@ agentctl config show                     Show config
 
 agentctl init -p ./project -o out.yaml   Generate manifest from code (LLM)
 agentctl push <kind> <file>              Register artifact (draft)
-agentctl get <kind> <name> [version]     Get artifact details
+agentctl push <kind> <file> --namespace <ns> --oci <ref>   Push standard doc (AgentCard, server.json, SKILL.md)
+agentctl get <kind> <name> [version] [--format a2a|server-json|skill-md]     Get artifact details
 agentctl list <kind>                     List artifacts
 agentctl delete <kind> <name> <version>  Delete draft
 agentctl promote <kind> <name> <ver> --to <status>
@@ -117,6 +118,7 @@ agentctl eval list <kind> <name> <ver>
 agentctl inspect <kind> <name> <ver>     Status + evals + promotion history
 agentctl deps <kind> <name> <ver>        Dependency graph from BOM
 agentctl search <query>                  Full-text search across all kinds
+agentctl import --from-a2a <url> --namespace --oci   Import agent from A2A AgentCard URL
 agentctl server start [--port] [--db]    Start server (UI at /, API at /api/v1)
 ```
 
