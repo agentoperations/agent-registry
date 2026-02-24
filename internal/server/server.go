@@ -35,6 +35,7 @@ func NewRouter(svc service.RegistryService, uiFS fs.FS) chi.Router {
 			r.Get("/evals", h.ListEvals)
 			r.Get("/inspect", h.Inspect)
 			r.Get("/dependencies", h.GetDependencies)
+			r.Get("/export", h.ExportStandardDoc)
 		})
 	})
 

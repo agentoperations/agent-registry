@@ -301,6 +301,31 @@ func (h *Handler) GetDependencies(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, graph, nil)
 }
 
+// --- Export ---
+
+func (h *Handler) ExportStandardDoc(w http.ResponseWriter, r *http.Request) {
+	kind, ok := parseKind(w, r)
+	if !ok {
+		return
+	}
+	name := extractName(r)
+	version := chi.URLParam(r, "version")
+
+	doc, contentType, err := h.svc.ExportStandardDoc(r.Context(), kind, name, version)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "artifact not found")
+			return
+		}
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", contentType)
+	w.WriteHeader(http.StatusOK)
+	w.Write(doc)
+}
+
 // --- Helpers ---
 
 func parseKind(w http.ResponseWriter, r *http.Request) (model.Kind, bool) {
